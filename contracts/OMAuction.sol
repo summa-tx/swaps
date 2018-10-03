@@ -1,4 +1,6 @@
-pragma solidity 0.4.26;
+pragma solidity 0.4.25;
+
+import {SPVStore} from "../bitcoin-spv/contracts/SPVStore.sol";
 
 
 contract OMAuction {
@@ -17,17 +19,17 @@ contract OMAuction {
         address indexed _seller,
         bytes indexed _partialTx);
 
-    event BidPlaced(
+    event BidValidated(
         bytes32 indexed _auctionId,
+        bytes32 indexed _txid,
         address indexed _bidder,
-        bool indexed _valid);
+        address _seller);
 
-    event BidAccepted(
-        bytes32 indexed _auctionId,
-        bytes32 indexed _txId,
-        address indexed _seller);
-
-    event AuctionClosed(bytes32 _txId, address indexed _seller, address indexed _bidder);
+    event AuctionClosed(
+        bytes32 indexed _acutionsId,
+        bytes32 indexed _txid,
+        address indexed _bidder,
+        address _seller);
 
     event AuctionCancelled(bytes32 _auctionId, address _seller);
 
@@ -36,15 +38,20 @@ contract OMAuction {
         address seller;                     // Seller address
         uint256 ethValue;                   // Eth asset value (wei)
         bytes partialTx;                    // Seller partial tx
-        mapping(address => uint256) bids;   // Bidder eth address to highest bidder value
         address bidder;                     // Accepted bidder address
         uint256 value;                      // Accepted bid value (sats)
-        bytes32 txId;                       // Accepted tx hash
+        bytes32 txid;                       // Accepted tx hash
         uint8 n;                            // Required number of confirmed blocks
     }
 
     mapping(bytes32 => Auction) public auctions;
     mapping(bytes32 => address) public auctionBids; // txid => bidder address
+
+    SPVStore public spvStore;                      // Deployed contract address of SPVStore.sol
+
+    function spvStoreAddress(address _spvStoreAddr) public {
+        spvStore = SPVStore(_spvStoreAddr);
+    }
 
     /// @notice 
     /// @param _auctionId   Auction identifier
@@ -52,6 +59,14 @@ contract OMAuction {
     /// @return             true if address is seller, false otherwise
     function isSeller(bytes32 _auctionId, address _seller) public returns (bool) {
         return (auctions[_auctionId].seller == _seller);
+    }
+
+    /// @notice 
+    /// @param _auctionId   Auction identifier
+    /// @param _bidder      Address to check
+    /// @return             true if address is selected bidder, false otherwise
+    function isBidder(bytes32 _auctionId, address _bidder) public returns (bool) {
+        return (auctions[_auctionId].bidder == _bidder);
     }
 
     /// @notice             Seller opens auction by committing eth
@@ -86,50 +101,55 @@ contract OMAuction {
         return true;
     }
 
-    /// @notice             Bidder places bid
+    /// @notice             Seller accepts bid, submits to SPVStore, validates tx format
     /// @param _auctionId   Auction identifier
-    /// @param _txid        Bid transaction id
-    /// @return             true if bid ia valid and tx stored in SPVStore, error otherwise
-    function placeBid(bytes32 _auctionId, bytes32 _txid) public returns (bool) {
-        // Bidder submits their txid for this contract to look up from SPVStore (OOB init submission)
-        // verify that tx was in SPVStore
-        // ask tx store for the number of inputs
-        // ask tx store for the number of outputs
-        // ask tx store if 2nd output is an OP_RETURN output
-        // ask tx store for op_return output data
-        // verify output data is a valid eth address
-    
-        // Get value
-        uint256 _value = _bidderTx.value;
-
-        /*
-        // Do not overwrite someone elses bid
-        // RJR: Do we only want to accept bids greater than the current greatest bid?
-        if (auctions[_auctionId].bids[_value] != 0) {
-            // Map bidder eth address to submitted value
-            auctions[_auctionId].bids[_value] = _bidder;
-        }
-        */
-        return true;
-    }
-
-    /// @notice             Seller accepts bid 
-    /// @param _auctionId   Auction identifier
-    /// @param _txid        Bid transaction id
+    /// @param _tx          The raw byte tx
+    /// @param _index       Merkel root index
+    /// @param _header      The raw byte header
     /// @return             true if bid is successfully accepted, error otherwise
-    function acceptBid(bytes32 _auctionId, bytes32 _txid) public returns (bool) {
+    function validateBidTransaction(
+        bytes32 _auctionId,
+        bytes _tx,
+        bytes _proof,
+        uint _index,
+        bytes _header
+    ) public returns (bool) {
 
         // Require auction state to be ACTIVE or BIDDING
-        require(auctions[_auctionId].state == (AuctionState.ACTIVE || AuctionState.BIDDING));
+        require(
+            auctions[_auctionId].state == AuctionStates.ACTIVE ||
+            auctions[_auctionId].state == AuctionStates.BIDDING);
 
-        // Require msg.sender to be seller
-        require(isSeller(_auctionId, msg.sender));
+        // Require number of block confirmations submitted is >= n
+
+        // Submit to SPVStore, get _txid back on success
+        _txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
+
+        // Require two inputs
+        require(spvStore.extractNumInputs(_tx) == 2);
+
+        // Require at least three outputs
+        require(spvStore.extractNumOutputs(_tx) >= 3);
+
+        // Require second output is an OP_RETURN
+        // Require OP_RETURN output contains a valid eth address
+        // auctions[_auctionId].bidder = OP_RETURN output
+       
+        // After transaction is validated, store in auctions mapping
+        auctions[_auctionId].txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
 
         // Eth address from accepted tx OP_RETURN output
         auctions[_auctionId].bidder = auctionBids[_txid];
 
+        // Update auction state to ACCEPTED
+        auctions[_auctionId].state == AuctionStates.ACCEPTED;
+
         // Emit BidAccepted event
-        emit BidAccepted(_auctionId, _txId, auctions[_auctionId].seller);
+        emit BidValidated(
+            _auctionId,
+            auctions[_auctionId].txid,
+            auctions[_auctionId].bidder,
+            auctions[_auctionId].seller);
 
         return true;
     }
@@ -146,16 +166,17 @@ contract OMAuction {
         require(auctions[_auctionId].bidder == msg.sender);
 
         // Send eth to selected bidder
-        msg.transfer(auctions[_auctionId].ethValue, auctions[_auctionId].bidder);
+        msg.sender.transfer(auctions[_auctionId].ethValue);
 
         // Update auction state to CLOSED
-        auctions[_auctionId].state == AuctionsStates.CLOSED;
+        auctions[_auctionId].state == AuctionStates.CLOSED;
 
         // Emit AuctionClosed event
         emit AuctionClosed(
-        auctions[_auctionId].txId,
-        auctions[_auctionId].seller,
-        auctions[_auctionId].bidder);
+        _auctionId,
+        auctions[_auctionId].txid,
+        auctions[_auctionId].bidder,
+        auctions[_auctionId].seller);
 
         return true;
     }
@@ -168,14 +189,16 @@ contract OMAuction {
 
         require(isSeller(_auctionId, msg.sender));
 
-        require(auctions[_auctionId].status != 
-            (AuctionStates.ACCEPTED || AuctionStates.CLOSED || AuctionStates.CANCELLED));
+        require(
+            auctions[_auctionId].state != AuctionStates.ACCEPTED ||
+            auctions[_auctionId].state != AuctionStates.CLOSED ||
+            auctions[_auctionId].state != AuctionStates.CANCELLED);
 
         // Set AuctionState to CLOSED
-        auctions[_auctionId].state = AuctionState.CLOSED;
+        auctions[_auctionId].state = AuctionStates.CLOSED;
 
         // Return eth to seller
-        msg.transfer(auctions[_auctionId].ethValue, _cancelAddr);
+        address(_cancelAddr).transfer(auctions[_auctionId].ethValue);
 
         // Emit AuctionCancelled event
         emit AuctionCancelled(_auctionId, msg.sender);
