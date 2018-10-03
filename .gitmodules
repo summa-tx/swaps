@@ -1,0 +1,4 @@
+[submodule "bitcoin-spv"]
+	path = bitcoin-spv
+    url = git@github.com:rrybarczyk/bitcoin-spv.git
+    branch = spvstore-update
