@@ -12,7 +12,7 @@ contract OMAuction {
         CANCELLED
     }
 
-    event AuctionOpen(
+    event AuctionActive(
         bytes32 indexed auctionId,
         address indexed _seller,
         bytes indexed _partialTx);
@@ -29,7 +29,7 @@ contract OMAuction {
 
     event AuctionClosed(bytes32 _txId, address indexed _seller, address indexed _bidder);
 
-    event AuctionCancelled();
+    event AuctionCancelled(bytes32 _auctionId, address _seller);
 
     struct Auction {
         AuctionStates state;
@@ -46,11 +46,13 @@ contract OMAuction {
     mapping(bytes32 => Auction) public auctions;
     mapping(bytes32 => address) public auctionBids; // txid => bidder address
 
-
+    /// @notice 
+    /// @param _auctionId   Auction identifier
+    /// @param _seller      Address to check
+    /// @return             true if address is seller, false otherwise
     function isSeller(bytes32 _auctionId, address _seller) public returns (bool) {
         return (auctions[_auctionId].seller == _seller);
     }
-
 
     /// @notice             Seller opens auction by committing eth
     /// @param _partialTx   Seller's partial transaction 
@@ -64,15 +66,22 @@ contract OMAuction {
     ) public payable returns (bool) {
 
         // Require seller to fund tx
-        // Require seller to supply partial tx
+        require(msg.value > 0);
 
+        // RJR: Require seller to supply partial tx
+
+        // Generate _auctionId
+        bytes32 _auctionId = abi.encodePacked(msg.sender, _partialTx);
+
+        // Add to auctions mapping
         auctions[_auctionId].seller = _seller;
         auctions[_auctionId].ethValue = msg.value;
         auctions[_auctionId].partialTx = _partialTx;
-        auctions[_auctionId].n = _n;
         auctions[_auctionId].state = AuctionStates.ACTIVE;
+        auctions[_auctionId].n = _n;
 
-        emit Auction(_auctionId, msg.sender, _partialTx);
+        // Emit AuctionActive event
+        emit AuctionActive(_auctionId, msg.sender, _partialTx);
 
         return true;
     }
@@ -151,7 +160,28 @@ contract OMAuction {
         return true;
     }
 
-    function cancelAuction() public returns (bool) { return true; }
+    /// @notice             Seller cancels auction
+    /// @param _auctionId   Auction identifier
+    /// @param _cancelAddr  Address to release funds
+    /// @return             true if auction is canceled, error otherwise
+    function cancelAuction(bytes32 _auctionId, address _cancelAddr) public returns (bool) {
+
+        require(isSeller(_auctionId, msg.sender));
+
+        require(auctions[_auctionId].status != 
+            (AuctionStates.ACCEPTED || AuctionStates.CLOSED || AuctionStates.CANCELLED));
+
+        // Set AuctionState to CLOSED
+        auctions[_auctionId].state = AuctionState.CLOSED;
+
+        // Return eth to seller
+        msg.transfer(auctions[_auctionId].ethValue, _cancelAddr);
+
+        // Emit AuctionCancelled event
+        emit AuctionCancelled(_auctionId, msg.sender);
+
+        return true;
+    }
 
     function _validateEthAddr(address _ethAddr) internal returns (bool) { return true; }
 }
