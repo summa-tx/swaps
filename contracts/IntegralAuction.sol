@@ -82,9 +82,6 @@ contract IntegralAuction {
         // Require Seller to fund tx
         require(msg.value > 0, "No asset received. Auction must be funded on initialize.");
 
-        // Require input is 36 bytes
-        require(_partialTx.length == 36, "Incorrect input length. Outpoint must be 36-bytes.");
-
         // Auction identifier is sha256 of Seller's parital transaction
         bytes32 _auctionId = _partialTx.hash256();
 
@@ -132,14 +129,17 @@ contract IntegralAuction {
         // Require at least three outputs
         require(_tx.extractNumOutputs() >= 3);
 
-        // Require second output is an OP_RETURN
-        // Require OP_RETURN output contains a valid eth address
-        uint256 outputType = spvStore.getTxOutOutputType(_txid, 1);
-        uint256 _value = spvStore.getTxOutValue(_txid, 1);
-        uint256 _payload = spvStore.getTxOutValue(_txid, 1);
+        // Require second output to be of OP_RETURN (3) type
+        require(spvStore.getTxOutOutputType(_txid, 1) == 3);
 
-        // TODO: Parse and validate payload to get eth address and set to bidder
-        // auction.bidder = parseEthAddress(_payload);
+        uint256 _value = spvStore.getTxOutValue(_txid, 1);
+        bytes memory _payload = spvStore.getTxOutPayload(_txid, 1);
+
+        // Require payload is 20 bytes
+        require(_payload.length == 20);
+
+        // Get bidder eth address from OP_RETURN payload bytes
+        auction.bidder = _addrFromBytes(_payload);
 
         // Distribute fee and bidder shares
         _distributeShares(_auctionId);
@@ -201,5 +201,14 @@ contract IntegralAuction {
         address(auction.bidder).transfer(_bidderShare);
 
         return true;
+    }
+
+    function _addrFromBytes(bytes _bytes) internal pure returns (address _addr) {
+        // Require 20 bytes in length
+        require(_bytes.length == 20);
+
+        assembly {
+            _addr := mload(add(_bytes,20))
+        }
     }
 }
