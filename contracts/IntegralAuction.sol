@@ -9,6 +9,7 @@ import {SafeMath} from "./SafeMath.sol";
 contract IntegralAuction {
 
     using BTCUtils for bytes;
+    using BTCUtils for uint256;
     using BytesLib for bytes;
     using SafeMath for uint256;
 
@@ -22,10 +23,10 @@ contract IntegralAuction {
     );
 
     event AuctionClosed(
-        bytes32 indexed _acutionsId,
-        bytes32 indexed _txid,
+        bytes32 indexed _acutionId,
         address indexed _bidder,
-        address _seller
+        address _seller,
+        uint256 _value
     );
 
     struct Auction {
@@ -38,7 +39,7 @@ contract IntegralAuction {
         address bidder;                     // Accepted bidder address
         uint256 value;                      // Accepted bid value (sats)
         bytes32 txid;                       // Accepted tx hash
-        uint8 diffSum;                            // Required number of confirmed blocks
+        uint256 diffSum;                            // Required number of confirmed blocks
     }
 
     address public manager;
@@ -53,7 +54,7 @@ contract IntegralAuction {
     /// @param _auctionId   Auction identifier
     /// @param _seller      Address to check
     /// @return             true if address is seller, false otherwise
-    function isSeller(bytes32 _auctionId, address _seller) public returns (bool) {
+    function isSeller(bytes32 _auctionId, address _seller) public view returns (bool) {
         return (auctions[_auctionId].seller == _seller);
     }
 
@@ -61,7 +62,7 @@ contract IntegralAuction {
     /// @param _auctionId   Auction identifier
     /// @param _bidder      Address to check
     /// @return             true if address is selected Bidder, false otherwise
-    function isBidder(bytes32 _auctionId, address _bidder) public returns (bool) {
+    function isBidder(bytes32 _auctionId, address _bidder) public view returns (bool) {
         return (auctions[_auctionId].bidder == _bidder);
     }
 
@@ -111,9 +112,53 @@ contract IntegralAuction {
     /// @param _headers     The raw bytes of all headers in order from earliest to latest
     /// @return             true if bid is successfully accepted, error otherwise
     function claim(bytes32 _auctionId, bytes _tx, bytes _proof, uint _index, bytes _headers) public returns (bool) {
+        Auction storage auction = auctions[_auctionId];
 
         // Require auction state to be ACTIVE or BIDDING
-        require(auctions[_auctionId].state == AuctionStates.ACTIVE);
+        require(auction.state == AuctionStates.ACTIVE);
+
+        // Require summation of submitted block headers difficulty >= diffSum
+        uint256 _diffSum = sumDifficulty(_headers);
+        require(_diffSum >= auction.diffSum);
+
+        bytes memory _header = _headers.slice(0, 80);
+
+        // Submit to SPVStore, get _txid back on success
+        bytes32 _txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
+
+        // Require two inputs
+        require(_tx.extractNumInputs() == 2);
+
+        // Require at least three outputs
+        require(_tx.extractNumOutputs() >= 3);
+
+        // Require second output is an OP_RETURN
+        // Require OP_RETURN output contains a valid eth address
+        uint256 outputType = spvStore.getTxOutOutputType(_txid, 1);
+        uint256 _value = spvStore.getTxOutValue(_txid, 1);
+        uint256 _payload = spvStore.getTxOutValue(_txid, 1);
+
+        // TODO: Parse and validate payload to get eth address and set to bidder
+        // auction.bidder = parseEthAddress(_payload);
+
+        // Distribute fee and bidder shares
+        _distributeShares(_auctionId);
+
+        // Update auction state to CLOSED
+        auction.state == AuctionStates.CLOSED;
+
+        // Emit AuctionClosed event
+        emit AuctionClosed(
+            _auctionId,
+            auction.bidder,
+            auction.seller,
+            _value
+        );
+
+        return true;
+    }
+
+    function sumDifficulty(bytes _headers) public pure returns (uint256) {
 
         // Require each header in list to be divisible by 80
         require(_headers.length % 80 == 0);
@@ -135,62 +180,26 @@ contract IntegralAuction {
             uint256 _iTarget = _iHeader.extractTarget();
 
             // Add ith header difficulty to difficulty sum
-            _diffSum += _iTarget.blockDifficultyFromTarget();
+            _diffSum += _iTarget.calculateDifficulty();
         }
+        return _diffSum;
+    }
 
-        // Require summation of submitted block headers difficulty >= diffSum 
-        require(_diffSum >= auctions[_auctionId].diffSum);
+    function _distributeShares(bytes32 _auctionId) internal returns (bool) {
+        Auction storage auction = auctions[_auctionId];
 
-        bytes memory _header = _headers.slice(0, 80);
-
-        // Submit to SPVStore, get _txid back on success
-        bytes32 _txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
-
-        // Require two inputs
-        require(spvStore.extractNumInputs(_tx) == 2);
-
-        // Require at least three outputs
-        require(spvStore.extractNumOutputs(_tx) >= 3);
-
-        // Require second output is an OP_RETURN
-        uint8 outputType = spvStore.getOutput(_txid, _index);
-
-        // Require OP_RETURN output contains a valid eth address
-        // auctions[_auctionId].bidder = OP_RETURN output
-
-        // After transaction is validated, store in auctions mapping
-        auctions[_auctionId].txid = _txid;
-        /*
-        // Eth address from accepted tx OP_RETURN output
-        auctions[_auctionId].bidder = auctionBids[_txid];
-
-        // summa share
-        uint256 _summaShare = auctions[_auctionId].ethValue / 400;
+        // Fee share
+        uint256 _feeShare = auction.ethValue / 400;
 
         // Bidder share
-        uint256 _bidderShare = auctions[_auctionId].ethValue - _summaShare;
+        uint256 _bidderShare = auction.ethValue - _feeShare;
 
-        // Send eth to selected bidder TODO: subtract summa share
-        address(auctions[_auctionId].bidder).transfer(_bidderShare);
+        // Transfer fee
+        address(manager).transfer(_feeShare);
 
-        // // Get final value from tx
-        // auctions[_auctionId].value = _value;
-         */
-
-        // Update auction state to CLOSED
-        auctions[_auctionId].state == AuctionStates.CLOSED;
-
-        // Emit BidAccepted event
-        emit AuctionClosed(
-            _auctionId,
-            auctions[_auctionId].txid,
-            auctions[_auctionId].bidder,
-            auctions[_auctionId].seller,
-            auctions[_auctionId].value
-        );
+        // Transfer eth to selected bidder
+        address(auction.bidder).transfer(_bidderShare);
 
         return true;
     }
-
-    function _validateEthAddr(address _ethAddr) internal returns (bool) { return true; }
 }
