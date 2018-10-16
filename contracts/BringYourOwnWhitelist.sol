@@ -2,6 +2,9 @@ pragma solidity 0.4.25;
 
 contract BringYourOwnWhitelist {
 
+    event AddedToWhitelist(address indexed _sender);
+    event RemovedFromWhitelist(address indexed _sender);
+
     mapping(address => mapping(address => bool)) whitelists;
     mapping(address => bool) whitelistExists;
     mapping(address => uint) openPositions;
@@ -28,7 +31,11 @@ contract BringYourOwnWhitelist {
         for (uint i = 0; i < _entries.length; i++) {
             address _a = _entries[i];
             whitelists[msg.sender][_a] = true;
+
         }
+
+        // Emit event notifying entries were added to the whitelist
+        emit AddedToWhitelist(msg.sender);
 
         return true;
     }
@@ -45,7 +52,11 @@ contract BringYourOwnWhitelist {
         for (uint i = 0; i < _entries.length; i++) {
             address _a = _entries[i];
             whitelists[msg.sender][_a] = false;
+
         }
+
+        // Emit event notifying entries were removed from the whitelist
+        emit RemovedFromWhitelist(msg.sender);
 
         return true;
     }

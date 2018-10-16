@@ -17,7 +17,7 @@ contract IntegralAuction is BringYourOwnWhitelist{
     enum AuctionStates { NONE, ACTIVE, CLOSED }
 
     event AuctionActive(
-        bytes32 indexed auctionId,
+        bytes32 indexed _auctionId,
         address indexed _seller,
         bytes _partialTx,
         uint256 _reservePrice
