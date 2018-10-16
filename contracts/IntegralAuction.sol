@@ -102,7 +102,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         require(auction.state == AuctionStates.ACTIVE);
 
         // Require summation of submitted block headers difficulty >= reqDiff
-        require(sumDifficulty(_headers) >= auction.reqDiff);
+        require(checkHeaderChain(_headers) >= auction.reqDiff);
 
         // Require at least two inputs and at least two outputs
         require(_tx.extractNumInputs() >= 2);
@@ -138,7 +138,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return true;
     }
 
-    function sumDifficulty(bytes _headers) public pure returns (uint256) {
+    function checkHeaderChain(bytes _headers) public pure returns (uint256) {
 
         // Require each header in list to be divisible by 80
         require(_headers.length % 80 == 0);
@@ -147,15 +147,13 @@ contract IntegralAuction is BringYourOwnWhitelist {
         uint256 _reqDiff = 0;
         uint256 _start = 0;
 
+        bytes32 _digest;
+
         // For each header, sum its difficulty
         for (uint256 i = 0; i < _headers.length / 80; i++) {
 
             // TODO: REQUIRE THAT HEADERS ARE A CHAIN
             // TODO: Adapt this check for each header
-            /*if (abi.encodePacked(_h.digest).bytesToUint() > _h.target) {
-                emit WorkTooLow(_h.digest, abi.encodePacked(_h.digest).bytesToUint(), _h.target);
-                return;
-            }*/
 
             // ith header start index
             _start = i * 80;
@@ -163,8 +161,17 @@ contract IntegralAuction is BringYourOwnWhitelist {
             // ith header
             bytes memory _iHeader = _headers.slice(_start, 80);
 
+            // After the first header, check that headers are in a chain
+            if (i != 0) {
+                require(_digest == _iHeader.extractPrevBlockBE().toBytes32());
+            }
+
             // ith header target
             uint256 _iTarget = _iHeader.extractTarget();
+
+            // Require that the header has sufficient work
+            _digest = _iHeader.hash256();
+            require(abi.encodePacked(_h.digest).bytesToUint() <= _h.target);
 
             // Add ith header difficulty to difficulty sum
             _reqDiff += _iTarget.calculateDifficulty();
