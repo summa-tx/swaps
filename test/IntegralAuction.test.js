@@ -20,6 +20,7 @@ let bidder;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
+let partialTx = '0x01000000000101abababababababababababababababababababababababababababababababab01000000'
 
 /* Calls Cancellable Warrant contract constructor and returns instance. */
 const constructIAC = async () => {
@@ -56,6 +57,7 @@ const constructIAC = async () => {
 describe('IntegralAuction', () => {
     let iac;
     let aucId;
+    let addAucRes;
 
     before(async () => {
         accounts = await web3.eth.getAccounts();
@@ -67,9 +69,9 @@ describe('IntegralAuction', () => {
         assert.ok(iac.options.address);
 
         // dirty hacks
-        aucId = await iac.methods.openAuction(seller, '0x00', 17, 100)
+        aucId = await iac.methods.openAuction(partialTx, 17, 100)
             .call({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
-        res = await iac.methods.openAuction(seller, '0x00', 17, 100)
+        addAucRes = await iac.methods.openAuction(partialTx, 17, 100)
             .send({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
     });
 
@@ -77,29 +79,35 @@ describe('IntegralAuction', () => {
         it('sets the manager address', async () =>
             assert.equal(await iac.methods.manager().call(), manager)));
 
-    describe('#isSeller', async () => {
-        it('returns true if address is seller', async () => {
-            res = await iac.methods.isSeller(aucId, seller).call();
-            assert.ok(res);
-        });
-        it('returns false if address is not seller', async () => {
-            res = await iac.methods.isSeller(aucId, bidder).call();
-            assert.equal(res, false);
-        });
-    });
-
     describe('#openAuction', async () => {
 
-        beforeEach(async () => await constructIAC());
+        it('returns the txid on success', async () =>
+        {
+            assert.equal(aucId, '0x4c9d64518103c3d2f773acb036b8a878519a36db39c4e3380725accf4f76ccff');
+        });
 
-        it.skip('returns true on success', async () =>
-            assert.ok(await iac.methods.openAuction(seller, partialTx, reservePrice, diffSum)
-                .send({ account: accounts[3], gas: gas, gasPrice: gasPrice })));
-
-        it.skip('adds a new auction to the auctions mapping', async () => { });
+        it('adds a new auction to the auctions mapping', async () => {
+            let res = await iac.methods.auctions(aucId).call();
+            assert.equal(res[0], 1);  // state
+            assert.equal(res[1], 10 ** 18);  // ethValue
+        });
         it.skip('emits an AuctionActive event', async () => { });
-        it.skip('errors if auction was not funded', async () => { });
-        it.skip('errors if auction already exists', async () => { });
+        it('increments open positions', async () => {
+            let res = await iac.methods.openPositions(seller).call();
+            assert.equal(res, 1);
+        });
+        it('errors if auction was not funded', async () => {
+            utils.expectThrow(
+                iac.methods.openAuction(partialTx, 17, 100)
+                .send({from: accounts[1], value: 0, gas: gas, gasPrice: gasPrice})
+            );
+        });
+        it('errors if auction already exists', async () => {
+            utils.expectThrow(
+                iac.methods.openAuction(partialTx, 17, 100)
+                    .send({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice})
+            );
+        });
     });
 
     describe('#claim', async () => {

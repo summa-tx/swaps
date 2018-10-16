@@ -37,6 +37,7 @@ contract IntegralAuction is BringYourOwnWhitelist{
         bytes partialTx;                    // Seller BTC address
         uint256 reservePrice;               // Minimum acceptable bid (sats)
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
+
         // Filled Later
         address bidder;                     // Accepted bidder address
         uint256 value;                      // Accepted bid value (sats)
@@ -55,22 +56,12 @@ contract IntegralAuction is BringYourOwnWhitelist{
         spvStore = SPVStore(_spvStoreAddr);
     }
 
-    /// @notice
-    /// @param _auctionId   Auction identifier
-    /// @param _seller      Address to check
-    /// @return             true if address is seller, false otherwise
-    function isSeller(bytes32 _auctionId, address _seller) public view returns (bool) {
-        return (auctions[_auctionId].seller == _seller);
-    }
-
     /// @notice                 Seller opens auction by committing ethereum
     /// @param _partialTx       Seller's partial transaction
-    /// @param _seller          Seller's ethereum address
     /// @param _reservePrice    Minimum acceptable bid (sats)
     /// @param _reqDiff         Minimum acceptable block difficulty summation
     /// @return                 true if Seller post is valid, false otherwise
     function openAuction(
-        address _seller,
         bytes _partialTx,
         uint256 _reservePrice,
         uint256 _reqDiff
@@ -80,21 +71,24 @@ contract IntegralAuction is BringYourOwnWhitelist{
         require(msg.value > 0, "No asset received. Auction must be funded on initialization.");
 
         // Auction identifier is sha256 of Seller's parital transaction
-        bytes32 _auctionId = _partialTx.hash256();
+        bytes32 _auctionId = keccak256(_partialTx.slice(0, 43));
 
         // Require unique auction identifier
         require(auctions[_auctionId].state == AuctionStates.NONE, "Auction exists.");
 
         // Add to auctions mapping
-        auctions[_auctionId].seller = _seller;
+        auctions[_auctionId].seller = msg.sender;
         auctions[_auctionId].reqDiff = _reqDiff;
         auctions[_auctionId].partialTx = _partialTx;
         auctions[_auctionId].ethValue = msg.value;
         auctions[_auctionId].reservePrice = _reservePrice;
         auctions[_auctionId].state = AuctionStates.ACTIVE;
 
+        // Increment Open positions
+        openPositions[msg.sender] = openPositions[msg.sender].add(1);
+
         // Emit AuctionActive event
-        emit AuctionActive(_auctionId, _seller, _partialTx, _reservePrice);
+        emit AuctionActive(_auctionId, msg.sender, _partialTx, _reservePrice);
 
         return _auctionId;
     }
@@ -132,6 +126,10 @@ contract IntegralAuction is BringYourOwnWhitelist{
 
         // Distribute fee and bidder shares
         _distributeEther(_auctionId);
+
+        // Decrement Open positions
+        address _seller = auction.seller;
+        openPositions[_seller] = openPositions[_seller].sub(1);
 
         // Emit AuctionClosed event
         emit AuctionClosed(

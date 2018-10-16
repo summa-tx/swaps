@@ -2,9 +2,9 @@ pragma solidity 0.4.25;
 
 contract BringYourOwnWhitelist {
 
-    mapping(address => mapping(address => bool)) whitelists;
-    mapping(address => bool) whitelistExists;
-    mapping(address => uint) openPositions;
+    mapping(address => mapping(address => bool)) public whitelists;
+    mapping(address => bool) public whitelistExists;
+    mapping(address => uint) public openPositions;
 
     /// @notice         Checks that the user has no open contracts
     /// @dev            We record open positions in a mapping that must be updated
