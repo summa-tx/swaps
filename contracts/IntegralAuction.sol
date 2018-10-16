@@ -4,9 +4,10 @@ import "./SPVStore.sol";
 import {BytesLib} from "./BytesLib.sol";
 import {BTCUtils} from "./BTCUtils.sol";
 import {SafeMath} from "./SafeMath.sol";
+import {BringYourOwnWhitelist} from "./BringYourOwnWhitelist.sol";
 
 
-contract IntegralAuction {
+contract IntegralAuction is BringYourOwnWhitelist{
 
     using BTCUtils for bytes;
     using BTCUtils for uint256;
@@ -43,14 +44,14 @@ contract IntegralAuction {
     }
 
     address public manager;
+    SPVStore public spvStore;  // Deployed contract address of SPVStore.sol
     mapping(bytes32 => Auction) public auctions;
-    SPVStore public spvStore;                      // Deployed contract address of SPVStore.sol
 
     constructor (address _manager) public { manager = _manager; }
 
     function spvStoreAddress(address _spvStoreAddr) public { spvStore = SPVStore(_spvStoreAddr); }
 
-    /// @notice 
+    /// @notice
     /// @param _auctionId   Auction identifier
     /// @param _seller      Address to check
     /// @return             true if address is seller, false otherwise
@@ -58,7 +59,7 @@ contract IntegralAuction {
         return (auctions[_auctionId].seller == _seller);
     }
 
-    /// @notice 
+    /// @notice
     /// @param _auctionId   Auction identifier
     /// @param _bidder      Address to check
     /// @return             true if address is selected Bidder, false otherwise
@@ -111,7 +112,7 @@ contract IntegralAuction {
     function claim(bytes32 _auctionId, bytes _tx, bytes _proof, uint _index, bytes _headers) public returns (bool) {
         Auction storage auction = auctions[_auctionId];
 
-        // Require auction state to be ACTIVE or BIDDING
+        // Require auction state to be ACTIVE
         require(auction.state == AuctionStates.ACTIVE);
 
         // Require summation of submitted block headers difficulty >= diffSum
@@ -130,7 +131,7 @@ contract IntegralAuction {
         require(_tx.extractNumOutputs() >= 3);
 
         // Require second output to be of OP_RETURN (3) type
-        require(spvStore.getTxOutOutputType(_txid, 1) == 3);
+        require(uint(spvStore.getTxOutOutputType(_txid, 1)) == 3);
 
         uint256 _value = spvStore.getTxOutValue(_txid, 1);
         bytes memory _payload = spvStore.getTxOutPayload(_txid, 1);

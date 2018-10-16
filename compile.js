@@ -13,6 +13,7 @@ const BTCUtilsPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'BTCUtil
 const ValidateSPVPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'ValidateSPV.sol')
 const BytesPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'BytesLib.sol')
 const SafeMathPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'SafeMath.sol')
+const WhitelistPath = path.resolve(__dirname, 'contracts', 'BringYourOwnWhitelist.sol')
 const IntegralAuctionPath = path.resolve(__dirname, 'contracts', 'IntegralAuction.sol')
 
 let input = {
@@ -21,6 +22,7 @@ let input = {
     'ValidateSPV.sol': fs.readFileSync(ValidateSPVPath, 'utf8'),
     'BytesLib.sol': fs.readFileSync(BytesPath, 'utf8'),
     'SafeMath.sol': fs.readFileSync(SafeMathPath, 'utf8'),
+    'BringYourOwnWhitelist.sol': fs.readFileSync(WhitelistPath, 'utf8'),
     'IntegralAuction.sol': fs.readFileSync(IntegralAuctionPath, 'utf8')
 }
 
