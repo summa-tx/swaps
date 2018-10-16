@@ -83,7 +83,7 @@ describe('IntegralAuction', () => {
 
         it('returns the txid on success', async () =>
         {
-            assert.equal(aucId, '0x4c9d64518103c3d2f773acb036b8a878519a36db39c4e3380725accf4f76ccff');
+            assert.equal(aucId, '0xf3a3f5b287088af26969112b1710edc7d1c69d41c845760161b77cd026332ca3');
         });
 
         it('adds a new auction to the auctions mapping', async () => {
@@ -105,7 +105,7 @@ describe('IntegralAuction', () => {
                 .send({from: accounts[1], value: 0, gas: gas, gasPrice: gasPrice})
             );
         });
-        
+
         it('errors if auction already exists', async () => {
             utils.expectThrow(
                 iac.methods.openAuction(partialTx, 17, 100)

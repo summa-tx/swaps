@@ -7,7 +7,7 @@ import {SafeMath} from "./SafeMath.sol";
 import {BringYourOwnWhitelist} from "./BringYourOwnWhitelist.sol";
 
 
-contract IntegralAuction is BringYourOwnWhitelist{
+contract IntegralAuction is BringYourOwnWhitelist {
 
     using BTCUtils for bytes;
     using BTCUtils for uint256;
@@ -17,14 +17,14 @@ contract IntegralAuction is BringYourOwnWhitelist{
     enum AuctionStates { NONE, ACTIVE, CLOSED }
 
     event AuctionActive(
-        bytes32 indexed auctionId,
+        bytes32 indexed _auctionId,
         address indexed _seller,
         bytes _partialTx,
         uint256 _reservePrice
     );
 
     event AuctionClosed(
-        bytes32 indexed _acutionId,
+        bytes32 indexed _auctionId,
         address indexed _bidder,
         address _seller,
         uint256 _value
@@ -34,8 +34,6 @@ contract IntegralAuction is BringYourOwnWhitelist{
         AuctionStates state;
         uint256 ethValue;                   // Eth asset value (wei)
         address seller;                     // Seller address
-        bytes partialTx;                    // Seller BTC address
-        uint256 reservePrice;               // Minimum acceptable bid (sats)
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
 
         // Filled Later
@@ -71,18 +69,16 @@ contract IntegralAuction is BringYourOwnWhitelist{
         require(msg.value > 0, "No asset received. Auction must be funded on initialization.");
 
         // Auction identifier is sha256 of Seller's parital transaction
-        bytes32 _auctionId = keccak256(_partialTx.slice(0, 43));
+        bytes32 _auctionId = keccak256(_partialTx.slice(7, 36));
 
         // Require unique auction identifier
         require(auctions[_auctionId].state == AuctionStates.NONE, "Auction exists.");
 
         // Add to auctions mapping
+        auctions[_auctionId].state = AuctionStates.ACTIVE;
+        auctions[_auctionId].ethValue = msg.value;
         auctions[_auctionId].seller = msg.sender;
         auctions[_auctionId].reqDiff = _reqDiff;
-        auctions[_auctionId].partialTx = _partialTx;
-        auctions[_auctionId].ethValue = msg.value;
-        auctions[_auctionId].reservePrice = _reservePrice;
-        auctions[_auctionId].state = AuctionStates.ACTIVE;
 
         // Increment Open positions
         openPositions[msg.sender] = openPositions[msg.sender].add(1);
@@ -94,12 +90,12 @@ contract IntegralAuction is BringYourOwnWhitelist{
     }
 
     /// @notice             Validated selected bid, bidder claims eth
-    /// @param _auctionId   Auction identifier
     /// @param _tx          The raw byte tx
     /// @param _index       Merkel root index
     /// @param _headers     The raw bytes of all headers in order from earliest to latest
     /// @return             true if bid is successfully accepted, error otherwise
-    function claim(bytes32 _auctionId, bytes _tx, bytes _proof, uint _index, bytes _headers) public returns (bool) {
+    function claim(bytes _tx, bytes _proof, uint _index, bytes _headers) public returns (bool) {
+        bytes32 _auctionId = keccak256(_tx.slice(7, 36));
         Auction storage auction = auctions[_auctionId];
 
         // Require auction state to be ACTIVE
@@ -108,9 +104,9 @@ contract IntegralAuction is BringYourOwnWhitelist{
         // Require summation of submitted block headers difficulty >= reqDiff
         require(sumDifficulty(_headers) >= auction.reqDiff);
 
-        // Require at least two inputs and at least three outputs
+        // Require at least two inputs and at least two outputs
         require(_tx.extractNumInputs() >= 2);
-        require(_tx.extractNumOutputs() >= 3);
+        require(_tx.extractNumOutputs() >= 2);
 
         // Submit to SPVStore, get _txid back on success
         bytes memory _header = _headers.slice(0, 80);
@@ -122,14 +118,14 @@ contract IntegralAuction is BringYourOwnWhitelist{
 
         // Get bidder eth address from OP_RETURN payload bytes
         bytes memory _payload = spvStore.getTxOutPayload(_txid, 1);
-        auction.bidder = _addrFromBytes(_payload);
+        auction.bidder = _payload.toAddress(0);
+
+        // Decrement Open positions
+        /*address _seller = auction.seller;*/
+        openPositions[auction.seller] = openPositions[auction.seller].sub(1);
 
         // Distribute fee and bidder shares
         _distributeEther(_auctionId);
-
-        // Decrement Open positions
-        address _seller = auction.seller;
-        openPositions[_seller] = openPositions[_seller].sub(1);
 
         // Emit AuctionClosed event
         emit AuctionClosed(
@@ -153,6 +149,13 @@ contract IntegralAuction is BringYourOwnWhitelist{
 
         // For each header, sum its difficulty
         for (uint256 i = 0; i < _headers.length / 80; i++) {
+
+            // TODO: REQUIRE THAT HEADERS ARE A CHAIN
+            // TODO: Adapt this check for each header
+            /*if (abi.encodePacked(_h.digest).bytesToUint() > _h.target) {
+                emit WorkTooLow(_h.digest, abi.encodePacked(_h.digest).bytesToUint(), _h.target);
+                return;
+            }*/
 
             // ith header start index
             _start = i * 80;
