@@ -24,18 +24,15 @@ let gasPrice = 100000000000;
 /* Calls Cancellable Warrant contract constructor and returns instance. */
 const constructIAC = async () => {
 
-    accounts = await web3.eth.getAccounts();
-    manager = accounts[1];
-    seller = accounts[2];
-    bidder = accounts[3];
-    
     let linkedLibs;
-
     accounts = await web3.eth.getAccounts();
+    manager = accounts[0];
+    seller = accounts[1];
+    bidder = accounts[2];
 
     let bytesContract = await new web3.eth.Contract(JSON.parse(compiledBytes.interface))
         .deploy({ data: compiledBytes.bytecode})
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice});
+        .send({ from: manager, gas: gas, gasPrice: gasPrice});
 
     // Link
     linkedLibs = await linker.linkBytecode(compiledBTCUtils.bytecode,
@@ -43,7 +40,7 @@ const constructIAC = async () => {
 
     let btcUtilsContract = await new web3.eth.Contract(JSON.parse(compiledBTCUtils.interface))
         .deploy({ data: linkedLibs })
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice});
+        .send({ from: manager, gas: gas, gasPrice: gasPrice});
 
     // Link
     linkedLibs = await linker.linkBytecode(compiledIAC.bytecode,
@@ -53,15 +50,27 @@ const constructIAC = async () => {
     // New Integral Auction contract instance
     return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
         .deploy({ data: linkedLibs, arguments: [manager] })
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice });
+        .send({ from: manager, gas: gas, gasPrice: gasPrice });
 };
 
 describe('IntegralAuction', () => {
     let iac;
+    let aucId;
 
-    it('deploys a contract', async () => {
+    before(async () => {
+        accounts = await web3.eth.getAccounts();
+        manager = accounts[0];
+        seller = accounts[1];
+        bidder = accounts[2];
+
         iac = await constructIAC();
         assert.ok(iac.options.address);
+
+        // dirty hacks
+        aucId = await iac.methods.openAuction(seller, '0x00', 17, 100)
+            .call({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
+        res = await iac.methods.openAuction(seller, '0x00', 17, 100)
+            .send({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
     });
 
     describe('#constructor', async () =>
@@ -69,13 +78,14 @@ describe('IntegralAuction', () => {
             assert.equal(await iac.methods.manager().call(), manager)));
 
     describe('#isSeller', async () => {
-        it.skip('returns true if address is seller', async () => { });
-        it.skip('returns false if address is not seller', async () => { });
-    });
-
-    describe('#isBidder', async () => {
-        it.skip('returns true if address is bidder', async () => { });
-        it.skip('returns false if address is not bidder', async () => { });
+        it('returns true if address is seller', async () => {
+            res = await iac.methods.isSeller(aucId, seller).call();
+            assert.ok(res);
+        });
+        it('returns false if address is not seller', async () => {
+            res = await iac.methods.isSeller(aucId, bidder).call();
+            assert.equal(res, false);
+        });
     });
 
     describe('#openAuction', async () => {

@@ -74,7 +74,7 @@ contract IntegralAuction is BringYourOwnWhitelist{
         bytes _partialTx,
         uint256 _reservePrice,
         uint256 _reqDiff
-    ) public payable returns (bool) {
+    ) public payable returns (bytes32) {
 
         // Require Seller to fund tx
         require(msg.value > 0, "No asset received. Auction must be funded on initialization.");
@@ -96,7 +96,7 @@ contract IntegralAuction is BringYourOwnWhitelist{
         // Emit AuctionActive event
         emit AuctionActive(_auctionId, _seller, _partialTx, _reservePrice);
 
-        return true;
+        return _auctionId;
     }
 
     /// @notice             Validated selected bid, bidder claims eth
