@@ -125,7 +125,16 @@ contract IntegralAuction is BringYourOwnWhitelist {
         openPositions[auction.seller] = openPositions[auction.seller].sub(1);
 
         // Distribute fee and bidder shares
-        _distributeEther(_auctionId);
+        uint256 _feeShare;
+        uint256 _bidderShare;
+        (_feeShare, _bidderShare) = allocateEther(_auctionId);
+
+        // Transfer fee
+        address(manager).transfer(_feeShare);
+
+        // Transfer eth to selected bidder
+        address(auction.bidder).transfer(_bidderShare);
+
 
         // Emit AuctionClosed event
         emit AuctionClosed(
@@ -141,7 +150,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     function checkHeaderChain(bytes _headers) public pure returns (uint256) {
 
         // Require each header in list to be divisible by 80
-        require(_headers.length % 80 == 0, 'Header chain not a multiple of 80 bytes');
+        require(_headers.length % 80 == 0, 'Header chain not a multiple of 80 bytes.');
 
         // Initialize difficulty summation variable
         uint256 _reqDiff = 0;
@@ -160,7 +169,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
             // After the first header, check that headers are in a chain
             if (i != 0) {
-                require(_digest == _iHeader.extractPrevBlockLE().toBytes32(), 'Header prevBlock reference incorrect');
+                require(_digest == _iHeader.extractPrevBlockLE().toBytes32(), 'Header prevBlock reference incorrect.');
             }
 
             // ith header target
@@ -168,7 +177,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
             // Require that the header has sufficient work
             _digest = _iHeader.hash256();
-            require(abi.encodePacked(_digest).reverseEndianness().bytesToUint() <= _iTarget, 'Header does not meet its target');
+            require(abi.encodePacked(_digest).reverseEndianness().bytesToUint() <= _iTarget, 'Header does not meet its target.');
 
             // Add ith header difficulty to difficulty sum
             _reqDiff += _iTarget.calculateDifficulty();
@@ -176,21 +185,15 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return _reqDiff;
     }
 
-    function _distributeEther(bytes32 _auctionId) internal returns (bool) {
+    function allocateEther(bytes32 _auctionId) public view returns (uint256, uint256) {
         Auction storage auction = auctions[_auctionId];
 
         // Fee share
-        uint256 _feeShare = auction.ethValue / 400;
+        uint256 _feeShare = auction.ethValue.div(400);
 
         // Bidder share
-        uint256 _bidderShare = auction.ethValue - _feeShare;
+        uint256 _bidderShare = auction.ethValue.sub(_feeShare);
 
-        // Transfer fee
-        address(manager).transfer(_feeShare);
-
-        // Transfer eth to selected bidder
-        address(auction.bidder).transfer(_bidderShare);
-
-        return true;
+        return (_feeShare, _bidderShare);
     }
 }

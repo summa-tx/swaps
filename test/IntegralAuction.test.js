@@ -20,7 +20,7 @@ let bidder;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
-const PARTIAL_TX = '0x01000000000101abababababababababababababababababababababababababababababababab01000000'
+const PARTIAL_TX = '0x010000000001011746bd867400f3494b8f44c24b83e1aa58c4f0ff25b4a61cffeffd4bc0f9ba300000000000ffffffff'
 const OP_RETURN_TX = '0x010000000001011746bd867400f3494b8f44c24b83e1aa58c4f0ff25b4a61cffeffd4bc0f9ba300000000000ffffffff024897070000000000220020a4333e5612ab1a1043b25755c89b16d55184a42f81799e623e6bc39db8539c180000000000000000166a14edb1b5c2f39af0fec151732585b1049b07895211024730440220276e0ec78028582054d86614c65bc4bf85ff5710b9d3a248ca28dd311eb2fa6802202ec950dd2a8c9435ff2d400cc45d7a4854ae085f49e05cc3f503834546d410de012103732783eef3af7e04d3af444430a629b16a9261e4025f52bf4d6d026299c37c7400000000'
 const HEADER_CHAIN = '0x0000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b00000020fe70e48339d6b17fbbf1340d245338f57336e97767cc240000000000000000005af53b865c27c6e9b5e5db4c3ea8e024f8329178a79ddb39f7727ea2fe6e6825d1349c5ba1192817e2d9515900000020baaea6746f4c16ccb7cd961655b636d39b5fe1519b8f15000000000000000000c63a8848a448a43c9e4402bd893f701cd11856e14cbbe026699e8fdc445b35a8d93c9c5ba1192817b945dc6c00000020f402c0b551b944665332466753f1eebb846a64ef24c71700000000000000000033fc68e070964e908d961cd11033896fa6c9b8b76f64a2db7ea928afa7e304257d3f9c5ba11928176164145d0000ff3f63d40efa46403afd71a254b54f2b495b7b0164991c2d22000000000000000000f046dc1b71560b7d0786cfbdb25ae320bd9644c98d5c7c77bf9df05cbe96212758419c5ba1192817a2bb2caa00000020e2d4f0edd5edd80bdcb880535443747c6b22b48fb6200d0000000000000000001d3799aa3eb8d18916f46bf2cf807cb89a9b1b4c56c3f2693711bf1064d9a32435429c5ba1192817752e49ae0000002022dba41dff28b337ee3463bf1ab1acf0e57443e0f7ab1d000000000000000000c3aadcc8def003ecbd1ba514592a18baddddcd3a287ccf74f584b04c5c10044e97479c5ba1192817c341f595'
 const PROOF_INDEX = 282
@@ -87,7 +87,7 @@ describe('IntegralAuction', () => {
 
         it('returns the txid on success', async () =>
         {
-            assert.equal(aucId, '0xf3a3f5b287088af26969112b1710edc7d1c69d41c845760161b77cd026332ca3');
+            assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
         });
 
         it('adds a new auction to the auctions mapping', async () => {
@@ -97,21 +97,7 @@ describe('IntegralAuction', () => {
         });
 
         it.skip('emits an AuctionActive event', async () => {
-            utils.expectEvent(
-                iac.getPastEvents(
-                'AuctionActive',
-                {
-                    fromBlock: 0,
-                    toBlock: 'latest',
-                    filter: {
-                        _auctionId: aucId,
-                        _seller: seller,
-                        _partialTx: PARTIAL_TX,
-                        _reservePrice: 17,
-                        _reqDiff: 100
-                    }
-                })
-            );
+            // TODO
         });
 
         it('increments open positions', async () => {
@@ -119,24 +105,34 @@ describe('IntegralAuction', () => {
             assert.equal(res, 1);
         });
 
-        it.skip('errors if auction was not funded', async () => {
-            utils.expectThrow(
-                iac.methods.open(PARTIAL_TX, 17, 100)
+        it('errors if auction was not funded', async () => {
+            await iac.methods.open(PARTIAL_TX, 17, 100)
                 .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
-            );
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('No asset received. Auction must be funded on initialization.') >= 1
+                    );
+                });
         });
 
-        it.skip('errors if auction already exists', async () => {
-            utils.expectThrow(
-                iac.methods.open(PARTIAL_TX, 17, 100)
-                    .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
-            );
+        it('errors if auction already exists', async () => {
+            await iac.methods.open(PARTIAL_TX, 17, 100)
+                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('Auction exists.') >= 1
+                    );
+                });
         });
     });
 
     describe('#claim', async () => {
         it.skip('returns true on success', async () => { });
         it.skip('updates auction state to CLOSED', async () => { });
+        it.skip('transfers fee to manager and emits Transfer event', async () => { });
+        it.skip('transfers bidder share to bidder and emits Transfer event', async () => { });
         it.skip('emits AuctionClosed event', async () => { });
         it.skip('errors if auction state is not ACTIVE', async () => { });
         it.skip('errors if total difficulty sum is too low', async () => { });
@@ -151,16 +147,48 @@ describe('IntegralAuction', () => {
             let res = await iac.methods.checkHeaderChain(HEADER_CHAIN).call();
             assert.equal(res, 49134394618239);
         });
-        it.skip('errors if the byte array length is not divisible by 80', async () => {});
-        it.skip('errors if the headers are not a chain', async () => { });
-        it.skip('errors if a header has insufficient work', async () => { });
-        it.skip('errors if the byte array length is not divisible by 80', async () => { });
 
+        it('errors if the byte array length is not divisible by 80', async () => {
+            await iac.methods.checkHeaderChain(HEADER_CHAIN + 'ab')
+                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('Header chain not a multiple of 80 bytes') >= 1
+                    );
+                });
+        });
+
+        it('errors if the headers are not a chain', async () => {
+            let bad_chain = '0x0000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+            await iac.methods.checkHeaderChain(bad_chain)
+                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('Header prevBlock reference incorrect') >= 1
+                    );
+                });
+        });
+
+        it('errors if a header has insufficient work', async () => {
+            let bad_chain = '0x1000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b00000020fe70e48339d6b17fbbf1340d245338f57336e97767cc240000000000000000005af53b865c27c6e9b5e5db4c3ea8e024f8329178a79ddb39f7727ea2fe6e6825d1349c5ba1192817e2d95159'
+            await iac.methods.checkHeaderChain(bad_chain)
+                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('Header does not meet its target') >= 1
+                    );
+                });
+        });
     });
 
-    describe('#_distributeEther', async () => {
-        it.skip('returns true on success', async () => { });
-        it.skip('transfers fee to manager and emits Transfer event', async () => { });
-        it.skip('transfers bidder share to bidder and emits Transfer event', async () => { });
+    describe('#allocateEther', async () => {
+        it('returns allocated values', async () => {
+            let res = await iac.methods.allocateEther(aucId).call();
+            assert.equal(res[0], 10 ** 18 / 400);
+            assert.equal(res[1], 10 ** 18 - res[0]);
+        });
     });
 });
