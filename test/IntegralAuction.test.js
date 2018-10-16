@@ -20,22 +20,20 @@ let bidder;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
+let partialTx = '0x01000000000101abababababababababababababababababababababababababababababababab01000000'
 
 /* Calls Cancellable Warrant contract constructor and returns instance. */
 const constructIAC = async () => {
 
-    accounts = await web3.eth.getAccounts();
-    manager = accounts[1];
-    seller = accounts[2];
-    bidder = accounts[3];
-    
     let linkedLibs;
-
     accounts = await web3.eth.getAccounts();
+    manager = accounts[0];
+    seller = accounts[1];
+    bidder = accounts[2];
 
     let bytesContract = await new web3.eth.Contract(JSON.parse(compiledBytes.interface))
         .deploy({ data: compiledBytes.bytecode})
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice});
+        .send({ from: manager, gas: gas, gasPrice: gasPrice});
 
     // Link
     linkedLibs = await linker.linkBytecode(compiledBTCUtils.bytecode,
@@ -43,7 +41,7 @@ const constructIAC = async () => {
 
     let btcUtilsContract = await new web3.eth.Contract(JSON.parse(compiledBTCUtils.interface))
         .deploy({ data: linkedLibs })
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice});
+        .send({ from: manager, gas: gas, gasPrice: gasPrice});
 
     // Link
     linkedLibs = await linker.linkBytecode(compiledIAC.bytecode,
@@ -53,43 +51,67 @@ const constructIAC = async () => {
     // New Integral Auction contract instance
     return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
         .deploy({ data: linkedLibs, arguments: [manager] })
-        .send({ from: accounts[0], gas: gas, gasPrice: gasPrice });
+        .send({ from: manager, gas: gas, gasPrice: gasPrice });
 };
 
 describe('IntegralAuction', () => {
     let iac;
+    let aucId;
+    let addAucRes;
 
-    it('deploys a contract', async () => {
+    before(async () => {
+        accounts = await web3.eth.getAccounts();
+        manager = accounts[0];
+        seller = accounts[1];
+        bidder = accounts[2];
+
         iac = await constructIAC();
         assert.ok(iac.options.address);
+
+        // dirty hacks
+        aucId = await iac.methods.openAuction(partialTx, 17, 100)
+            .call({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
+        addAucRes = await iac.methods.openAuction(partialTx, 17, 100)
+            .send({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice});
     });
 
     describe('#constructor', async () =>
         it('sets the manager address', async () =>
             assert.equal(await iac.methods.manager().call(), manager)));
 
-    describe('#isSeller', async () => {
-        it.skip('returns true if address is seller', async () => { });
-        it.skip('returns false if address is not seller', async () => { });
-    });
-
-    describe('#isBidder', async () => {
-        it.skip('returns true if address is bidder', async () => { });
-        it.skip('returns false if address is not bidder', async () => { });
-    });
-
     describe('#openAuction', async () => {
 
-        beforeEach(async () => await constructIAC());
+        it('returns the txid on success', async () =>
+        {
+            assert.equal(aucId, '0xf3a3f5b287088af26969112b1710edc7d1c69d41c845760161b77cd026332ca3');
+        });
 
-        it.skip('returns true on success', async () =>
-            assert.ok(await iac.methods.openAuction(seller, partialTx, reservePrice, diffSum)
-                .send({ account: accounts[3], gas: gas, gasPrice: gasPrice })));
+        it('adds a new auction to the auctions mapping', async () => {
+            let res = await iac.methods.auctions(aucId).call();
+            assert.equal(res[0], 1);  // state
+            assert.equal(res[1], 10 ** 18);  // ethValue
+        });
 
-        it.skip('adds a new auction to the auctions mapping', async () => { });
         it.skip('emits an AuctionActive event', async () => { });
-        it.skip('errors if auction was not funded', async () => { });
-        it.skip('errors if auction already exists', async () => { });
+
+        it('increments open positions', async () => {
+            let res = await iac.methods.openPositions(seller).call();
+            assert.equal(res, 1);
+        });
+
+        it('errors if auction was not funded', async () => {
+            utils.expectThrow(
+                iac.methods.openAuction(partialTx, 17, 100)
+                .send({from: accounts[1], value: 0, gas: gas, gasPrice: gasPrice})
+            );
+        });
+
+        it('errors if auction already exists', async () => {
+            utils.expectThrow(
+                iac.methods.openAuction(partialTx, 17, 100)
+                    .send({from: accounts[1], value: 10 ** 18, gas: gas, gasPrice: gasPrice})
+            );
+        });
     });
 
     describe('#claim', async () => {

@@ -8,11 +8,11 @@ fs.removeSync(buildPath)
 fs.ensureDirSync(buildPath)
 
 // Paths to solidity contracts
-const SPVStorePath = path.resolve(__dirname, './bitcoin-spv/contracts', 'SPVStore.sol')
-const BTCUtilsPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'BTCUtils.sol')
-const ValidateSPVPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'ValidateSPV.sol')
-const BytesPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'BytesLib.sol')
-const SafeMathPath = path.resolve(__dirname, './bitcoin-spv/contracts', 'SafeMath.sol')
+const SPVStorePath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'SPVStore.sol')
+const BTCUtilsPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'BTCUtils.sol')
+const ValidateSPVPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'ValidateSPV.sol')
+const BytesPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'BytesLib.sol')
+const SafeMathPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'SafeMath.sol')
 const WhitelistPath = path.resolve(__dirname, 'contracts', 'BringYourOwnWhitelist.sol')
 const IntegralAuctionPath = path.resolve(__dirname, 'contracts', 'IntegralAuction.sol')
 
