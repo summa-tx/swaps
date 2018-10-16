@@ -20,7 +20,8 @@ contract IntegralAuction is BringYourOwnWhitelist {
         bytes32 indexed _auctionId,
         address indexed _seller,
         bytes _partialTx,
-        uint256 _reservePrice
+        uint256 _reservePrice,
+        uint256 _reqDiff
     );
 
     event AuctionClosed(
@@ -84,7 +85,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         openPositions[msg.sender] = openPositions[msg.sender].add(1);
 
         // Emit AuctionActive event
-        emit AuctionActive(_auctionId, msg.sender, _partialTx, _reservePrice);
+        emit AuctionActive(_auctionId, msg.sender, _partialTx, _reservePrice, _reqDiff);
 
         return _auctionId;
     }
@@ -99,19 +100,18 @@ contract IntegralAuction is BringYourOwnWhitelist {
         Auction storage auction = auctions[_auctionId];
 
         // Require auction state to be ACTIVE
-        require(auction.state == AuctionStates.ACTIVE);
+        require(auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
 
         // Require summation of submitted block headers difficulty >= reqDiff
-        require(checkHeaderChain(_headers) >= auction.reqDiff);
+        require(checkHeaderChain(_headers) >= auction.reqDiff, 'Not enough difficulty in header chain.');
 
-        // Require at least two inputs and at least two outputs
-        require(_tx.extractNumInputs() >= 2);
-        require(_tx.extractNumOutputs() >= 2);
+        // Require at least two outputs
+        require(_tx.extractNumOutputs() >= 2, 'Must have at least 2 TxOuts');
 
         // Submit to SPVStore, get _txid back on success
         bytes memory _header = _headers.slice(0, 80);
         bytes32 _txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
-        require(uint(spvStore.getTxOutOutputType(_txid, 1)) == 3);
+        require(uint(spvStore.getTxOutOutputType(_txid, 1)) == 3, 'TxOut at index 1 must be an OP_RETURN');
 
         // Update auction state to CLOSED
         auction.state = AuctionStates.CLOSED;
@@ -141,7 +141,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     function checkHeaderChain(bytes _headers) public pure returns (uint256) {
 
         // Require each header in list to be divisible by 80
-        require(_headers.length % 80 == 0);
+        require(_headers.length % 80 == 0, 'Header chain not a multiple of 80 bytes');
 
         // Initialize difficulty summation variable
         uint256 _reqDiff = 0;
@@ -152,9 +152,6 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // For each header, sum its difficulty
         for (uint256 i = 0; i < _headers.length / 80; i++) {
 
-            // TODO: REQUIRE THAT HEADERS ARE A CHAIN
-            // TODO: Adapt this check for each header
-
             // ith header start index
             _start = i * 80;
 
@@ -163,7 +160,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
             // After the first header, check that headers are in a chain
             if (i != 0) {
-                require(_digest == _iHeader.extractPrevBlockBE().toBytes32());
+                require(_digest == _iHeader.extractPrevBlockLE().toBytes32(), 'Header prevBlock reference incorrect');
             }
 
             // ith header target
@@ -171,7 +168,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
             // Require that the header has sufficient work
             _digest = _iHeader.hash256();
-            require(abi.encodePacked(_h.digest).bytesToUint() <= _h.target);
+            require(abi.encodePacked(_digest).reverseEndianness().bytesToUint() <= _iTarget, 'Header does not meet its target');
 
             // Add ith header difficulty to difficulty sum
             _reqDiff += _iTarget.calculateDifficulty();
@@ -195,14 +192,5 @@ contract IntegralAuction is BringYourOwnWhitelist {
         address(auction.bidder).transfer(_bidderShare);
 
         return true;
-    }
-
-    function _addrFromBytes(bytes _bytes) internal pure returns (address _addr) {
-        // Require 20 bytes in length
-        require(_bytes.length == 20);
-
-        assembly {
-            _addr := mload(add(_bytes,20))
-        }
     }
 }
