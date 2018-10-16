@@ -60,7 +60,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     /// @param _reservePrice    Minimum acceptable bid (sats)
     /// @param _reqDiff         Minimum acceptable block difficulty summation
     /// @return                 true if Seller post is valid, false otherwise
-    function openAuction(
+    function open(
         bytes _partialTx,
         uint256 _reservePrice,
         uint256 _reqDiff
