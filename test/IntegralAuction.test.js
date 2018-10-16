@@ -91,17 +91,21 @@ describe('IntegralAuction', () => {
             assert.equal(res[0], 1);  // state
             assert.equal(res[1], 10 ** 18);  // ethValue
         });
+
         it.skip('emits an AuctionActive event', async () => { });
+
         it('increments open positions', async () => {
             let res = await iac.methods.openPositions(seller).call();
             assert.equal(res, 1);
         });
+
         it('errors if auction was not funded', async () => {
             utils.expectThrow(
                 iac.methods.openAuction(partialTx, 17, 100)
                 .send({from: accounts[1], value: 0, gas: gas, gasPrice: gasPrice})
             );
         });
+        
         it('errors if auction already exists', async () => {
             utils.expectThrow(
                 iac.methods.openAuction(partialTx, 17, 100)
