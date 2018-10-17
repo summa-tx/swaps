@@ -117,7 +117,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // Get bidder eth address from OP_RETURN payload bytes
         bytes memory _payload = spvStore.getTxOutPayload(_txid, 1);
         auction.bidder = _payload.toAddress(0);
-        require(checkWhitelist(auction.seller, auction.bidder));
+        require(checkWhitelist(auction.seller, auction.bidder), 'Bidder is not whitelisted.');
 
         // Decrement Open positions
         address _seller = auction.seller;

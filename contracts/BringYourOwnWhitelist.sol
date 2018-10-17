@@ -63,15 +63,16 @@ contract BringYourOwnWhitelist {
 
     /// @notice         Checks a user's whitelist to see if a counterparty is approved
     /// @dev            Approves all users if no whitelist is set
+    /// @param _list    The user whose list  we want to check
     /// @param _entry   The entry to check
     /// @return         true if approved, or no whitelist set, otherwise false
     function checkWhitelist(address _list, address _entry) public view returns (bool) {
-        // check if msg.sender is exists
+        // check if the user has a whitelist 
         if (!whitelistExists[_list]) {
             return true;
         }
         // look for _entry in whitelists
-        // false is _entry is not whitelisted, true if they are
+        // false if _entry is not whitelisted, true if they are
         return whitelists[_list][_entry];
     }
 }
