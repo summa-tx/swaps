@@ -47,12 +47,9 @@ contract IntegralAuction is BringYourOwnWhitelist {
     SPVStore public spvStore;  // Deployed contract address of SPVStore.sol
     mapping(bytes32 => Auction) public auctions;
 
-    constructor (address _manager) public {
+    constructor (address _manager, address _spvStoreAddr) public {
         manager = _manager;
-    }
-
-    function spvStoreAddress(address _spvStoreAddr) public {
-        spvStore = SPVStore(_spvStoreAddr);
+        spvStore = SPVStore(_spvStoreAddr);s
     }
 
     /// @notice                 Seller opens auction by committing ethereum
@@ -111,6 +108,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // Submit to SPVStore, get _txid back on success
         bytes memory _header = _headers.slice(0, 80);
         bytes32 _txid = spvStore.validateTransaction(_tx, _proof, _index, _header);
+
         require(uint(spvStore.getTxOutOutputType(_txid, 1)) == 3, 'TxOut at index 1 must be an OP_RETURN');
 
         // Update auction state to CLOSED
@@ -121,7 +119,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         auction.bidder = _payload.toAddress(0);
 
         // Decrement Open positions
-        /*address _seller = auction.seller;*/
+        address _seller = auction.seller;
         openPositions[auction.seller] = openPositions[auction.seller].sub(1);
 
         // Distribute fee and bidder shares
