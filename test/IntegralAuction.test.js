@@ -185,7 +185,7 @@ describe('IntegralAuction', () => {
                     );
                 });
         });
-
+        it.skip('errors if a whitelist exists and the bidder is not whitelisted', async () => { });
         it.skip('errors if total difficulty sum is too low', async () => { });
         it.skip('errors if nOutputs is less than two', async () => { });
         it.skip('errors if second output is not OP_RETURN', async () => { });

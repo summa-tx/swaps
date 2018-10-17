@@ -49,7 +49,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
     constructor (address _manager, address _spvStoreAddr) public {
         manager = _manager;
-        spvStore = SPVStore(_spvStoreAddr);s
+        spvStore = SPVStore(_spvStoreAddr);
     }
 
     /// @notice                 Seller opens auction by committing ethereum
@@ -117,6 +117,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // Get bidder eth address from OP_RETURN payload bytes
         bytes memory _payload = spvStore.getTxOutPayload(_txid, 1);
         auction.bidder = _payload.toAddress(0);
+        require(checkWhitelist(auction.seller, auction.bidder));
 
         // Decrement Open positions
         address _seller = auction.seller;

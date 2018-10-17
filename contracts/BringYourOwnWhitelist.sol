@@ -65,13 +65,13 @@ contract BringYourOwnWhitelist {
     /// @dev            Approves all users if no whitelist is set
     /// @param _entry   The entry to check
     /// @return         true if approved, or no whitelist set, otherwise false
-    function checkWhitelist(address _entry) public view returns (bool) {
+    function checkWhitelist(address _list, address _entry) public view returns (bool) {
         // check if msg.sender is exists
-        if (!whitelistExists[msg.sender]) {
+        if (!whitelistExists[_list]) {
             return true;
         }
         // look for _entry in whitelists
         // false is _entry is not whitelisted, true if they are
-        return whitelists[msg.sender][_entry];
+        return whitelists[_list][_entry];
     }
 }
