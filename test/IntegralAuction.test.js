@@ -18,7 +18,7 @@ listeners.forEach(listener => process.removeListener('warning', listener));
 let accounts;
 let manager;
 let seller;
-let whitelistTestAccount;
+let whitelis4,000,000thtTestAccount;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
@@ -322,13 +322,10 @@ describe('IntegralAuction', () => {
     });
 
     describe('#checkWhitelist', async () => {
+        // This function is pretty thoroughly checked in removeWhitelistEntries
         it('returns true if a whitelist has not been created', async () => {
             let res = await iac.methods.checkWhitelist(accounts[7], accounts[8]).call();
             assert.ok(res);
-        });
-
-        it.skip('returns whitelist status if a whitelist exists', async () => {
-            /// This is thoroughly checked in removeWhitelistEntries
         });
     });
 });
