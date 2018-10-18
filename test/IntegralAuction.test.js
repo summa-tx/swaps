@@ -18,6 +18,7 @@ listeners.forEach(listener => process.removeListener('warning', listener));
 let accounts;
 let manager;
 let seller;
+let whitelistTestAccount;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
@@ -77,6 +78,7 @@ describe('IntegralAuction', () => {
         accounts = await web3.eth.getAccounts();
         manager = accounts[0];
         seller = accounts[1];
+        whitelistTestAccount = accounts[5];
 
         iac = await constructIAC();
         assert.ok(iac.options.address);
@@ -137,7 +139,7 @@ describe('IntegralAuction', () => {
         });
     });
 
-    describe('#claim', async () => {
+    describe.only('#claim', async () => {
         let managerStartBalance;
         let bidderStartBalance;
 
@@ -146,9 +148,27 @@ describe('IntegralAuction', () => {
             bidderStartBalance = parseInt(await web3.eth.getBalance(BIDDER));
         });
 
+        it('errors if a whitelist exists and the bidder is not whitelisted', async () => {
+            await iac.methods.addWhitelistEntries([seller])
+                .send({from: seller, gas: gas, gasPrice: gasPrice});
+
+            await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
+                .send({from: seller, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.search('Bidder is not whitelisted.') >= 1
+                    );
+                });
+        });
+
+
         it('returns true on success', async () => {
             // Call and send so we can access the response, and also update the state
             // Dirty hacks
+            await iac.methods.addWhitelistEntries([BIDDER])
+                .send({from: seller, gas: gas, gasPrice: gasPrice});
+
             let res = await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
                 .call({from: seller, gas: gas, gasPrice: gasPrice});
             await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
@@ -185,7 +205,7 @@ describe('IntegralAuction', () => {
                     );
                 });
         });
-        it.skip('errors if a whitelist exists and the bidder is not whitelisted', async () => { });
+
         it.skip('errors if total difficulty sum is too low', async () => { });
         it.skip('errors if nOutputs is less than two', async () => { });
         it.skip('errors if second output is not OP_RETURN', async () => { });
@@ -239,5 +259,58 @@ describe('IntegralAuction', () => {
             assert.equal(res[0], 10 ** 18 / 400);
             assert.equal(res[1], 10 ** 18 - res[0]);
         });
+    });
+
+    describe('#addWhitelistEntries', async () => {
+
+        it('updates whitelistExists on creation', async () => {
+            let res = await iac.methods.whitelistExists(whitelistTestAccount).call();
+            assert(res === false);
+            res = await iac.methods
+            await iac.methods.addWhitelistEntries([whitelistTestAccount])
+                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
+            res = await iac.methods.whitelistExists(whitelistTestAccount).call();
+            assert.ok(res);
+        });
+
+        it('adds entries to the whitelist', async () => {
+            await iac.methods.addWhitelistEntries([BIDDER, seller, whitelistTestAccount])
+                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
+            let res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            assert.ok(res);
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
+            assert.ok(res);
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, whitelistTestAccount).call();
+            assert.ok(res);
+        });
+
+        it.skip('emits an added event', async () => { });
+    });
+
+    describe('#removeWhitelistEntires', async () => {
+        it.skip('removes entries from the whitelist', async () => {
+            // Add entries and check they exist
+            await iac.methods.addWhitelistEntries([BIDDER, seller])
+                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
+            let res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            assert.ok(res);
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
+            assert.ok(res);
+
+            // Now remove them
+            await iac.methods.removeWhitelistEntries([BIDDER, seller])
+                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            assert(res === false);
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
+            assert(res === false);
+        });
+
+        it.skip('emits a removed event', async () => { });
+    });
+
+    describe('#checkWhitelist', async () => {
+        it.skip('returns true if a whitelist has not been created', async () => { });
+        it.skip('returns the whitelist state', async () => { });
     });
 });

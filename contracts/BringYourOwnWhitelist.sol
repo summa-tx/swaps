@@ -2,20 +2,12 @@ pragma solidity 0.4.25;
 
 contract BringYourOwnWhitelist {
 
-    event AddedToWhitelist(address indexed _sender);
-    event RemovedFromWhitelist(address indexed _sender);
+    event AddedWhitelistEntries(address indexed _sender);
+    event RemovedWhitelistEntries(address indexed _sender);
 
     mapping(address => mapping(address => bool)) public whitelists;
     mapping(address => bool) public whitelistExists;
     mapping(address => uint) public openPositions;
-
-    /// @notice         Checks that the user has no open contracts
-    /// @dev            We record open positions in a mapping that must be updated
-    /// @param _user    The user's address
-    /// @return         false if they have active contracts, otherwise true
-    function noOpenPositions(address _user) public view returns (bool) {
-        return openPositions[_user] == 0;
-    }
 
     /// @notice             Adds approved counterparties to a whitelist
     /// @dev                Updates the whitelists mapping
@@ -35,7 +27,7 @@ contract BringYourOwnWhitelist {
         }
 
         // Emit event notifying entries were added to the whitelist
-        emit AddedToWhitelist(msg.sender);
+        emit AddedWhitelistEntries(msg.sender);
 
         return true;
     }
@@ -46,7 +38,7 @@ contract BringYourOwnWhitelist {
     /// @return             true if successfully updated, otherwise OOG error
     function removeWhitelistEntires(address[] _entries) public returns (bool) {
         // remove entries to the whitelists mapping
-        require(noOpenPositions(msg.sender), 'Must close all positions before removing entries.');
+        require(openPositions[msg.sender] == 0, 'Must close all positions before removing entries.');
 
         // removes entries from the whitelists mapping
         for (uint i = 0; i < _entries.length; i++) {
@@ -56,7 +48,7 @@ contract BringYourOwnWhitelist {
         }
 
         // Emit event notifying entries were removed from the whitelist
-        emit RemovedFromWhitelist(msg.sender);
+        emit RemovedWhitelistEntries(msg.sender);
 
         return true;
     }
@@ -67,8 +59,9 @@ contract BringYourOwnWhitelist {
     /// @param _entry   The entry to check
     /// @return         true if approved, or no whitelist set, otherwise false
     function checkWhitelist(address _list, address _entry) public view returns (bool) {
-        // check if the user has a whitelist 
-        if (!whitelistExists[_list]) {
+        // check if the user has a whitelist
+        // also check if the list and entry are the same
+        if (!whitelistExists[_list] || _list == _entry) {
             return true;
         }
         // look for _entry in whitelists

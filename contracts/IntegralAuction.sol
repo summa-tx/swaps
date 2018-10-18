@@ -120,7 +120,6 @@ contract IntegralAuction is BringYourOwnWhitelist {
         require(checkWhitelist(auction.seller, auction.bidder), 'Bidder is not whitelisted.');
 
         // Decrement Open positions
-        address _seller = auction.seller;
         openPositions[auction.seller] = openPositions[auction.seller].sub(1);
 
         // Distribute fee and bidder shares
