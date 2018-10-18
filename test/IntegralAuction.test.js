@@ -8,7 +8,6 @@ const compiledSPV = require('../build/SPVStore.json')
 const compiledIAC = require('../build/IntegralAuction.json');
 const utils = require('./utils');
 const linker = require('solc/linker');
-const BN = web3.utils.BN;
 
 
 // Suppress web3 MaxListenersExceededWarning
@@ -18,7 +17,7 @@ listeners.forEach(listener => process.removeListener('warning', listener));
 let accounts;
 let manager;
 let seller;
-let whitelis4,000,000thtTestAccount;
+let whitelistTestAccount;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
