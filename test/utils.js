@@ -73,17 +73,6 @@ module.exports = {
         days:    function(val) { return val * this.hours(24) },
         weeks:   function(val) { return val * this.days(7) },
         years:   function(val) { return val * this.days(365)}
-    },
-
-    expectEvent: expectEvent = async (promise) => {
-        await promise
-            .then( (events) => {
-                if (!Object.keys(events).length == 0) {
-                    assert.ok(events);
-                } else {
-                    assert.fail('No event emitted');
-                }
-            }).catch(err => assert.fail(err));
     }
 }
 
