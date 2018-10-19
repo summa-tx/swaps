@@ -6,8 +6,9 @@ const compiledBTCUtils = require('../build/BTCUtils.json');
 const compiledBytes = require('../build/BytesLib.json');
 const compiledSPV = require('../build/SPVStore.json')
 const compiledIAC = require('../build/IntegralAuction.json');
-const utils = require('./utils');
 const linker = require('solc/linker');
+const utils = require('./utils');
+const constants = require('./constants');
 
 
 // Suppress web3 MaxListenersExceededWarning
@@ -21,12 +22,7 @@ let whitelistTestAccount;
 
 let gas = 5000000;
 let gasPrice = 100000000000;
-const PARTIAL_TX = '0x010000000001011746bd867400f3494b8f44c24b83e1aa58c4f0ff25b4a61cffeffd4bc0f9ba300000000000ffffffff'
-const OP_RETURN_TX = '0x010000000001011746bd867400f3494b8f44c24b83e1aa58c4f0ff25b4a61cffeffd4bc0f9ba300000000000ffffffff024897070000000000220020a4333e5612ab1a1043b25755c89b16d55184a42f81799e623e6bc39db8539c180000000000000000166a14edb1b5c2f39af0fec151732585b1049b07895211024730440220276e0ec78028582054d86614c65bc4bf85ff5710b9d3a248ca28dd311eb2fa6802202ec950dd2a8c9435ff2d400cc45d7a4854ae085f49e05cc3f503834546d410de012103732783eef3af7e04d3af444430a629b16a9261e4025f52bf4d6d026299c37c7400000000'
-const HEADER_CHAIN = '0x0000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b00000020fe70e48339d6b17fbbf1340d245338f57336e97767cc240000000000000000005af53b865c27c6e9b5e5db4c3ea8e024f8329178a79ddb39f7727ea2fe6e6825d1349c5ba1192817e2d9515900000020baaea6746f4c16ccb7cd961655b636d39b5fe1519b8f15000000000000000000c63a8848a448a43c9e4402bd893f701cd11856e14cbbe026699e8fdc445b35a8d93c9c5ba1192817b945dc6c00000020f402c0b551b944665332466753f1eebb846a64ef24c71700000000000000000033fc68e070964e908d961cd11033896fa6c9b8b76f64a2db7ea928afa7e304257d3f9c5ba11928176164145d0000ff3f63d40efa46403afd71a254b54f2b495b7b0164991c2d22000000000000000000f046dc1b71560b7d0786cfbdb25ae320bd9644c98d5c7c77bf9df05cbe96212758419c5ba1192817a2bb2caa00000020e2d4f0edd5edd80bdcb880535443747c6b22b48fb6200d0000000000000000001d3799aa3eb8d18916f46bf2cf807cb89a9b1b4c56c3f2693711bf1064d9a32435429c5ba1192817752e49ae0000002022dba41dff28b337ee3463bf1ab1acf0e57443e0f7ab1d000000000000000000c3aadcc8def003ecbd1ba514592a18baddddcd3a287ccf74f584b04c5c10044e97479c5ba1192817c341f595'
-const PROOF_INDEX = 282
-const PROOF = '0x48e5a1a0e616d8fd92b4ef228c424e0c816799a256c6a90892195ccfc53300d6e35a0d6de94b656694589964a252957e4673a9fb1d2f8b4a92e3f0a7bb654fddb94e5a1e6d7f7f499fd1be5dd30a73bf5584bf137da5fdd77cc21aeb95b9e35788894be019284bd4fbed6dd6118ac2cb6d26bc4be4e423f55a3a48f2874d8d02a65d9c87d07de21d4dfe7b0a9f4a23cc9a58373e9e6931fefdb5afade5df54c91104048df1ee999240617984e18b6f931e2373673d0195b8c6987d7ff7650d5ce53bcec46e13ab4f2da1146a7fc621ee672f62bc22742486392d75e55e67b09960c3386a0b49e75f1723d6ab28ac9a2028a0c72866e2111d79d4817b88e17c821937847768d92837bae3832bb8e5a4ab4434b97e00a6c10182f211f592409068d6f5652400d9a3d1cc150a7fb692e874cc42d76bdafc842f2fe0f835a7c24d2d60c109b187d64571efbaa8047be85821f8e67e0e85f2f5894bc63d00c2ed9d640296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c2'
-const BIDDER = '0xedb1b5c2f39af0fec151732585b1049b07895211';
+
 
 /* Calls Cancellable Warrant contract constructor and returns instance. */
 const constructIAC = async () => {
@@ -65,7 +61,7 @@ const constructIAC = async () => {
     // New Integral Auction contract instance
     return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
         .deploy({ data: linkedCode, arguments: [manager, SPVContract.options.address] })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice });
+        .send({ from: manager, gas: gas, gasPrice: gasPrice});
 };
 
 describe('IntegralAuction', () => {
@@ -82,7 +78,7 @@ describe('IntegralAuction', () => {
         iac = await constructIAC();
         assert.ok(iac.options.address);
 
-        await iac.methods.open(PARTIAL_TX, 17, 100)
+        await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
             .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
             .then(res => {
                 addAucRes = res;
@@ -117,7 +113,7 @@ describe('IntegralAuction', () => {
         });
 
         it('errors if auction was not funded', async () => {
-            await iac.methods.open(PARTIAL_TX, 17, 100)
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
                 .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
@@ -128,7 +124,7 @@ describe('IntegralAuction', () => {
         });
 
         it('errors if auction already exists', async () => {
-            await iac.methods.open(PARTIAL_TX, 17, 100)
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
@@ -145,14 +141,14 @@ describe('IntegralAuction', () => {
 
         before(async () => {
             managerStartBalance = parseInt(await web3.eth.getBalance(manager));
-            bidderStartBalance = parseInt(await web3.eth.getBalance(BIDDER));
+            bidderStartBalance = parseInt(await web3.eth.getBalance(constants.GOOD.BIDDER));
         });
 
         it('errors if a whitelist exists and the bidder is not whitelisted', async () => {
             await iac.methods.addWhitelistEntries([seller])
                 .send({from: seller, gas: gas, gasPrice: gasPrice});
 
-            await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
+            await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
                 .send({from: seller, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
@@ -163,10 +159,10 @@ describe('IntegralAuction', () => {
         });
 
         it('returns on success', async () => {
-            await iac.methods.addWhitelistEntries([BIDDER])
+            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER])
                 .send({from: seller, gas: gas, gasPrice: gasPrice});
 
-            claimRes = await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
+            claimRes = await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
                 .send({from: seller, gas: gas, gasPrice: gasPrice})
             assert.ok(claimRes);
         });
@@ -178,18 +174,18 @@ describe('IntegralAuction', () => {
 
         it.skip('transfers fee to manager', async () => {
             let managerBalance = parseInt(await web3.eth.getBalance(manager));
-            /// This is the test i wanted to write, but it doesn't work
+            assert.equal(managerBalance, 99162182800000000000);
+            /// This is the test I wanted to write, but it doesn't work
             /// It's off by 10000 for no reason I can tell
             // let managerShare = (10 ** 18) / 400;
             // console.log(managerBalance)
             // console.log(managerStartBalance)
             // console.log(managerShare)
             // assert.equal(managerBalance, managerStartBalance + managerShare);
-            assert.equal(managerBalance, 99162182800000000000);
         });
 
         it('transfers bidder share to bidder', async () => {
-            let bidderBalance = parseInt(await web3.eth.getBalance(BIDDER));
+            let bidderBalance = parseInt(await web3.eth.getBalance(constants.GOOD.BIDDER));
             let bidderShare = 10 ** 18 - ((10 ** 18) / 400);
             assert.equal(bidderBalance, bidderStartBalance + bidderShare);
         });
@@ -199,7 +195,7 @@ describe('IntegralAuction', () => {
         });
 
         it('errors if auction state is not ACTIVE', async () => {
-            await iac.methods.claim(OP_RETURN_TX, PROOF, PROOF_INDEX, HEADER_CHAIN)
+            await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
                 .send({from: seller, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
@@ -209,19 +205,57 @@ describe('IntegralAuction', () => {
                 });
         });
 
-        it.skip('errors if total difficulty sum is too low', async () => { });
-        it.skip('errors if nOutputs is less than two', async () => { });
-        it.skip('errors if second output is not OP_RETURN', async () => { });
+        it('errors if total difficulty sum is too low', async () => {
+            await iac.methods.open(constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100)
+                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
+
+            await iac.methods.claim(constants.WORK_TOO_LOW.OP_RETURN_TX, constants.WORK_TOO_LOW.PROOF, constants.WORK_TOO_LOW.PROOF_INDEX, constants.WORK_TOO_LOW.HEADER_CHAIN)
+                .send({from: seller, gas: gas, gasPrice: gasPrice})
+                .then(() => {assert(false)})
+                .catch(e => {
+                    assert(
+                        e.message.search('Not enough difficulty in header chain.') >= 1
+                    );
+                });
+        });
+        it.skip('errors if nOutputs is less than two', async () => {
+            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 100)
+                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
+
+            await iac.methods.claim(constants.FEW_OUTPUTS.OP_RETURN_TX, constants.FEW_OUTPUTS.PROOF, constants.FEW_OUTPUTS.PROOF_INDEX, constants.FEW_OUTPUTS.HEADER_CHAIN)
+                .send({from: seller, gas: gas, gasPrice: gasPrice})
+                .then(() => {assert(false)})
+                .catch(e => {
+                    assert(
+                        e.message.search('Must have at least 2 TxOuts') >= 1
+                    );
+                });
+        });
+        it('errors if second output is not OP_RETURN', async () => {
+            await iac.methods.open(constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0)
+                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
+
+            await iac.methods.claim(constants.OP_RETURN_WRONG.OP_RETURN_TX, constants.OP_RETURN_WRONG.PROOF, constants.OP_RETURN_WRONG.PROOF_INDEX, constants.OP_RETURN_WRONG.HEADER_CHAIN)
+                .send({from: seller, gas: gas, gasPrice: gasPrice})
+                .then(() => {
+                    assert(false)
+                })
+                .catch(e => {
+                    assert(
+                        e.message.search('TxOut at index 1 must be an OP_RETURN') >= 1
+                    );
+                });
+        });
     });
 
     describe('#checkHeaderChain', async () => {
         it('returns the total difficulty summation on success', async () => {
-            let res = await iac.methods.checkHeaderChain(HEADER_CHAIN).call();
+            let res = await iac.methods.checkHeaderChain(constants.GOOD.HEADER_CHAIN).call();
             assert.equal(res, 49134394618239);
         });
 
         it('errors if the byte array length is not divisible by 80', async () => {
-            await iac.methods.checkHeaderChain(HEADER_CHAIN + 'ab')
+            await iac.methods.checkHeaderChain(constants.GOOD.HEADER_CHAIN + 'ab')
                 .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
@@ -278,9 +312,9 @@ describe('IntegralAuction', () => {
         });
 
         it('adds entries to the whitelist', async () => {
-            await iac.methods.addWhitelistEntries([BIDDER, seller, whitelistTestAccount])
+            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER, seller, whitelistTestAccount])
                 .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            let res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            let res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
             assert.ok(res);
             res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
             assert.ok(res);
@@ -299,17 +333,17 @@ describe('IntegralAuction', () => {
 
         it('removes entries from the whitelist', async () => {
             // Add entries and check they exist
-            await iac.methods.addWhitelistEntries([BIDDER, seller])
+            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER, seller])
                 .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            let res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            let res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
             assert.ok(res);
             res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
             assert.ok(res);
 
             // Now remove them
-            removeRes = await iac.methods.removeWhitelistEntries([BIDDER, seller])
+            removeRes = await iac.methods.removeWhitelistEntries([constants.GOOD.BIDDER, seller])
                 .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, BIDDER).call();
+            res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
             assert(res === false);
             res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
             assert(res === false);
