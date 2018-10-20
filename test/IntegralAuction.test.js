@@ -218,8 +218,8 @@ describe('IntegralAuction', () => {
                     );
                 });
         });
-        it.skip('errors if nOutputs is less than two', async () => {
-            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 100)
+        it('errors if nOutputs is less than two', async () => {
+            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
 
             await iac.methods.claim(constants.FEW_OUTPUTS.OP_RETURN_TX, constants.FEW_OUTPUTS.PROOF, constants.FEW_OUTPUTS.PROOF_INDEX, constants.FEW_OUTPUTS.HEADER_CHAIN)
