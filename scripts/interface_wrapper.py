@@ -41,6 +41,16 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
 
 
 def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
+    '''Makes an unsigned transaction calling open
+
+    Args:
+        partial_tx (riemann.tx.Tx): the partial transaction to submit
+        reservePrice         (int): the lowest acceptable price (not enforced)
+        reqDiff              (int): the amount of difficult required
+                                    in the proof's header chain
+    Returns:
+        (ethereum.transactions.Transaction): the unsigned tx
+    '''
     contract_method_args = [
         partial_tx.to_bytes(),
         reservePrice,
@@ -53,6 +63,16 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
 
 
 def create_claim_tx(tx, proof, index, headers, **kwargs):
+    '''Makes an unsigned transaction calling claim
+
+    Args:
+        tx (riemann.tx.Tx): the fully signed tx
+        proof        (str): the merkle inclusion proof
+        index        (int): the index of the tx for merkle verification
+        headers      (str): the header chain containing work
+    Returns:
+        (ethereum.transactions.Transaction): the unsigned tx
+    '''
     contract_method_args = [
         tx.to_bytes(),
         bytes.fromhex(proof),
