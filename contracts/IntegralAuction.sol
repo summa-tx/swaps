@@ -92,7 +92,12 @@ contract IntegralAuction is BringYourOwnWhitelist {
     /// @param _index       Merkel root index
     /// @param _headers     The raw bytes of all headers in order from earliest to latest
     /// @return             true if bid is successfully accepted, error otherwise
-    function claim(bytes _tx, bytes _proof, uint _index, bytes _headers) public returns (bool) {
+    function claim(
+        bytes _tx,
+        bytes _proof,
+        uint _index,
+        bytes _headers
+    ) public returns (bool) {
         bytes32 _auctionId = keccak256(_tx.slice(7, 36));
         Auction storage auction = auctions[_auctionId];
 
