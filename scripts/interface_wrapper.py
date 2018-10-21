@@ -1,6 +1,9 @@
 import json
 from ethereum import abi, transactions
 
+# Loads the abi from the file
+# For some reason solc generates json stored as a string inside json
+# So we have to call .loads twice
 with open('build/IntegralAuction.json', 'r') as jsonfile:
     j = json.loads(jsonfile.read())
     ABI = json.loads(j['interface'])
@@ -15,11 +18,12 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
         value                   (int): amount in wei payable to contract
                                        method. is 0 if contract method is
                                        not payable
-        **kwargs:
-            nonce       (int): number of transactions already sent by
-                               that account
-            gas_price   (int): gas price
-            start_gas   (int): gas limit
+        contract_address        (str): address of the contract to call
+        value                   (int): amount of ether (in wei) to include
+        nonce                   (int): number of transactions already sent by
+                                       signing account
+        gas_price               (int): gas price
+        start_gas               (int): gas limit
     Returns:
         (Transaction instance): unsigned transaction
     '''
@@ -48,6 +52,13 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
         reservePrice         (int): the lowest acceptable price (not enforced)
         reqDiff              (int): the amount of difficult required
                                     in the proof's header chain
+        **kwargs:
+            contract_address (str): address of the contract to call
+            value            (int): amount of ether (in wei) to include
+            nonce            (int): number of transactions already sent by
+                                    signing account
+            gas_price        (int): gas price
+            start_gas        (int): gas limit
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
@@ -70,6 +81,14 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
         proof        (str): the merkle inclusion proof
         index        (int): the index of the tx for merkle verification
         headers      (str): the header chain containing work
+        **kwargs:
+            contract_address (str): address of the contract to call
+            value            (int): amount of ether (in wei) to include
+            nonce            (int): number of transactions already sent by
+                                    signing account
+            gas_price        (int): gas price
+            start_gas        (int): gas limit
+
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
