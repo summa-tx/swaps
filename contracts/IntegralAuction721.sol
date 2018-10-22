@@ -85,19 +85,10 @@ contract IntegralAuction721 is IntegralAuction {
     }
 
     function distributeERC721(bytes32 _auctionId) internal returns (bool) {
-        // Calculate fee and bidder shares
-        uint256 _feeShare;
-        uint256 _bidderShare;
-        (_feeShare, _bidderShare) = allocate(_auctionId);
-
-        // Transfer fee to manager
-        require(
-            IERC721(auctions[_auctionId].asset).transfer(manager, _feeShare)
-        );
-
         // Transfer tokens to bidder
         require(
-            IERC721(auctions[_auctionId].asset).transfer(auctions[_auctionId].bidder, _bidderShare)
+            IERC721(auctions[_auctionId].asset).transferFrom(
+                address(this), auctions[_auctionId].bidder, auctions[_auctionId]._value)
         );
 
         return true;
