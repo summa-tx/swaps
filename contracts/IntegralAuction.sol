@@ -21,6 +21,8 @@ contract IntegralAuction is BringYourOwnWhitelist {
     event AuctionActive(
         bytes32 indexed _auctionId,
         address indexed _seller,
+        address indexed _asset,
+        uint256 _value,
         bytes _partialTx,
         uint256 _reservePrice,
         uint256 _reqDiff
@@ -28,20 +30,23 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
     event AuctionClosed(
         bytes32 indexed _auctionId,
-        address indexed _bidder,
         address _seller,
-        uint256 _value
+        address indexed _bidder,
+        address indexed _asset,
+        uint256 _value,
+        uint256 _BTCValue
     );
 
     struct Auction {
         AuctionStates state;
-        uint256 ethValue;                   // Eth asset value (wei)
-        address seller;                     // Seller address
+        uint256 value;                      // Asset amount or 721 ID
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
+        address asset;                      // Asset info
+        address seller;                     // Seller address
 
         // Filled Later
         address bidder;                     // Accepted bidder address
-        uint256 value;                      // Accepted bid value (sats)
+        uint256 BTCvalue;                   // Accepted bid value (sats)
         bytes32 txid;                       // Accepted tx hash
     }
 
@@ -66,7 +71,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // Require Seller to fund tx
         require(msg.value > 0, "No asset received. Auction must be funded on initialization.");
 
-        // Auction identifier is sha256 of Seller's parital transaction
+        // Auction identifier is keccak256 of Seller's parital transaction
         bytes32 _auctionId = keccak256(_partialTx.slice(7, 36));
 
         // Require unique auction identifier
@@ -74,7 +79,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
         // Add to auctions mapping
         auctions[_auctionId].state = AuctionStates.ACTIVE;
-        auctions[_auctionId].ethValue = msg.value;
+        auctions[_auctionId].value = msg.value;
         auctions[_auctionId].seller = msg.sender;
         auctions[_auctionId].reqDiff = _reqDiff;
 
@@ -82,7 +87,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         openPositions[msg.sender] = openPositions[msg.sender].add(1);
 
         // Emit AuctionActive event
-        emit AuctionActive(_auctionId, msg.sender, _partialTx, _reservePrice, _reqDiff);
+        emit AuctionActive(_auctionId, msg.sender, address(0), msg.value, _partialTx, _reservePrice, _reqDiff);
 
         return _auctionId;
     }
@@ -110,15 +115,16 @@ contract IntegralAuction is BringYourOwnWhitelist {
         require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
 
         (_txid, _bidder, _value) = checkTx(_tx);
-        _auction.bidder = _bidder;
         (_diff, _merkleRoot) = checkHeaders(_headers, _auction.reqDiff);
         checkProof(_txid, _merkleRoot, _proof, _index);
 
         // Get bidder eth address from OP_RETURN payload bytes
-        require(checkWhitelist(_auction.seller, _auction.bidder), 'Bidder is not whitelisted.');
+        require(checkWhitelist(_auction.seller, _bidder), 'Bidder is not whitelisted.');
 
-        // Update auction state to CLOSED
+        // Update auction state
+        _auction.bidder = _bidder;
         _auction.state = AuctionStates.CLOSED;
+        _auction.BTCvalue = _value;
 
         distributeEther(_auctionId);
 
@@ -128,8 +134,10 @@ contract IntegralAuction is BringYourOwnWhitelist {
         // Emit AuctionClosed event
         emit AuctionClosed(
             _auctionId,
-            _auction.bidder,
             _auction.seller,
+            _auction.bidder,
+            address(0),
+            _auction.value,
             _value
         );
 
@@ -177,20 +185,20 @@ contract IntegralAuction is BringYourOwnWhitelist {
     }
 
 
-    function allocateEther(bytes32 _auctionId) public view returns (uint256, uint256) {
+    function allocate(bytes32 _auctionId) public view returns (uint256, uint256) {
         Auction storage auction = auctions[_auctionId];
         // Fee share
-        uint256 _feeShare = auction.ethValue.div(400);
+        uint256 _feeShare = auction.value.div(400);
         // Bidder share
-        uint256 _bidderShare = auction.ethValue.sub(_feeShare);
+        uint256 _bidderShare = auction.value.sub(_feeShare);
         return (_feeShare, _bidderShare);
     }
 
     function distributeEther(bytes32 _auctionId) internal returns (bool) {
-        // Distribute fee and bidder shares
+        // Calculate fee and bidder shares
         uint256 _feeShare;
         uint256 _bidderShare;
-        (_feeShare, _bidderShare) = allocateEther(_auctionId);
+        (_feeShare, _bidderShare) = allocate(_auctionId);
 
         // Transfer fee
         address(manager).transfer(_feeShare);

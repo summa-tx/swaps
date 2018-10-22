@@ -249,9 +249,9 @@ describe('IntegralAuction', () => {
         });
     });
 
-    describe('#allocateEther', async () => {
+    describe('#allocate', async () => {
         it('returns allocated values', async () => {
-            let res = await iac.methods.allocateEther(aucId).call();
+            let res = await iac.methods.allocate(aucId).call();
             assert.equal(res[0], 10 ** 18 / 400);
             assert.equal(res[1], 10 ** 18 - res[0]);
         });

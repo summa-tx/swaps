@@ -15,6 +15,10 @@ const BytesPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'BytesLib.sol
 const SafeMathPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'SafeMath.sol')
 const WhitelistPath = path.resolve(__dirname, 'contracts', 'BringYourOwnWhitelist.sol')
 const IntegralAuctionPath = path.resolve(__dirname, 'contracts', 'IntegralAuction.sol')
+const Auction20Path = path.resolve(__dirname, 'contracts', 'IntegralAuction20.sol')
+const IERC20Path = path.resolve(__dirname, 'contracts', 'IERC20.sol')
+const IERC721Path = path.resolve(__dirname, 'contracts', 'IERC721.sol')
+
 
 let input = {
     'SPVStore.sol': fs.readFileSync(SPVStorePath, 'utf8'),
@@ -23,7 +27,11 @@ let input = {
     'BytesLib.sol': fs.readFileSync(BytesPath, 'utf8'),
     'SafeMath.sol': fs.readFileSync(SafeMathPath, 'utf8'),
     'BringYourOwnWhitelist.sol': fs.readFileSync(WhitelistPath, 'utf8'),
-    'IntegralAuction.sol': fs.readFileSync(IntegralAuctionPath, 'utf8')
+    'IntegralAuction.sol': fs.readFileSync(IntegralAuctionPath, 'utf8'),
+    'IntegralAuction20.sol': fs.readFileSync(Auction20Path, 'utf8'),
+    'IERC20.sol': fs.readFileSync(IERC20Path, 'utf8'),
+    'IERC721.sol': fs.readFileSync(IERC721Path, 'utf8')
+
 }
 
 const output = solc.compile({sources: input}, 1);
