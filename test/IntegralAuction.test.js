@@ -4,7 +4,7 @@ const Web3 = require('web3');
 const web3 = new Web3(ganache.provider());
 const compiledBTCUtils = require('../build/BTCUtils.json');
 const compiledBytes = require('../build/BytesLib.json');
-const compiledSPV = require('../build/SPVStore.json')
+const compiledSPV = require('../build/ValidateSPV.json')
 const compiledIAC = require('../build/IntegralAuction.json');
 const linker = require('solc/linker');
 const utils = require('./utils');
@@ -55,12 +55,13 @@ const constructIAC = async () => {
 
     // Link
     linkedCode = await linker.linkBytecode(compiledIAC.bytecode,
-        {'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
+        {'ValidateSPV.sol:ValidateSPV': SPVContract.options.address,
+         'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
          'BytesLib.sol:BytesLib': bytesContract.options.address});
 
     // New Integral Auction contract instance
     return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
-        .deploy({ data: linkedCode, arguments: [manager, SPVContract.options.address] })
+        .deploy({ data: linkedCode, arguments: [manager] })
         .send({ from: manager, gas: gas, gasPrice: gasPrice});
 };
 
@@ -242,49 +243,7 @@ describe('IntegralAuction', () => {
                 })
                 .catch(e => {
                     assert(
-                        e.message.search('TxOut at index 1 must be an OP_RETURN') >= 1
-                    );
-                });
-        });
-    });
-
-    describe('#checkHeaderChain', async () => {
-        it('returns the total difficulty summation on success', async () => {
-            let res = await iac.methods.checkHeaderChain(constants.GOOD.HEADER_CHAIN).call();
-            assert.equal(res, 49134394618239);
-        });
-
-        it('errors if the byte array length is not divisible by 80', async () => {
-            await iac.methods.checkHeaderChain(constants.GOOD.HEADER_CHAIN + 'ab')
-                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.search('Header chain not a multiple of 80 bytes') >= 1
-                    );
-                });
-        });
-
-        it('errors if the headers are not a chain', async () => {
-            let bad_chain = '0x0000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
-            await iac.methods.checkHeaderChain(bad_chain)
-                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.search('Header prevBlock reference incorrect') >= 1
-                    );
-                });
-        });
-
-        it('errors if a header has insufficient work', async () => {
-            let bad_chain = '0x1000002073bd2184edd9c4fc76642ea6754ee40136970efc10c4190000000000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371ac43c4da4161c8c216349c5ba11928170d38782b00000020fe70e48339d6b17fbbf1340d245338f57336e97767cc240000000000000000005af53b865c27c6e9b5e5db4c3ea8e024f8329178a79ddb39f7727ea2fe6e6825d1349c5ba1192817e2d95159'
-            await iac.methods.checkHeaderChain(bad_chain)
-                .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.search('Header does not meet its target') >= 1
+                        e.message.search('Not an OP_RETURN output') >= 1
                     );
                 });
         });
