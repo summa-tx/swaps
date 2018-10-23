@@ -20,7 +20,7 @@ const Auction721Path = path.resolve(__dirname, 'contracts', 'IntegralAuction721.
 const AuctionETHPath = path.resolve(__dirname, 'contracts', 'IntegralAuctionETH.sol')
 const IERC20Path = path.resolve(__dirname, 'contracts', 'IERC20.sol')
 const IERC721Path = path.resolve(__dirname, 'contracts', 'IERC721.sol')
-
+const AuctionDummyPath = path.resolve(__dirname, 'contracts', 'AuctionDummy.sol')
 
 let input = {
     'SPVStore.sol': fs.readFileSync(SPVStorePath, 'utf8'),
@@ -34,7 +34,8 @@ let input = {
     'IntegralAuction721.sol': fs.readFileSync(Auction721Path, 'utf8'),
     'IntegralAuctionETH.sol': fs.readFileSync(AuctionETHPath, 'utf8'),
     'IERC20.sol': fs.readFileSync(IERC20Path, 'utf8'),
-    'IERC721.sol': fs.readFileSync(IERC721Path, 'utf8')
+    'IERC721.sol': fs.readFileSync(IERC721Path, 'utf8'),
+    'AuctionDummy.sol': fs.readFileSync(AuctionDummyPath, 'utf8'),
 }
 
 const output = solc.compile({sources: input}, 1);

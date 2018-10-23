@@ -58,6 +58,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     }
 
     function ensureFunding(address _asset, uint256 _value) internal;
+    function distribute(bytes32 _auctionId) internal;
 
     /// @notice                 Seller opens auction by committing ethereum
     /// @param _partialTx       Seller's partial transaction
@@ -103,9 +104,10 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return _auctionId;
     }
 
-    /// @notice             Validated selected bid, bidder claims eth
+    /// @notice             Validate selected bid, bidder claims eth
     /// @param _tx          The raw byte tx
-    /// @param _index       Merkel root index
+    /// @param _proof       The merkle proof of inclusion
+    /// @param _index       Merkle proof leaf index to aid verification
     /// @param _headers     The raw bytes of all headers in order from earliest to latest
     /// @return             true if bid is successfully accepted, error otherwise
     function claim(
@@ -116,7 +118,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     ) public returns (bool) {
         bytes32 _auctionId = keccak256(_tx.slice(7, 36));
         Auction storage _auction = auctions[_auctionId];
-        
+
         bytes32 _txid;
         address _bidder;
         uint64 _value;
@@ -156,6 +158,9 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return true;
     }
 
+    /// @notice             Validated selected bid, bidder claims eth
+    /// @param _tx          The raw byte tx
+    /// @return             true if bid is successfully accepted, error otherwise
     function checkTx(
         bytes _tx
     ) public pure returns (bytes32 _txid, address _bidder, uint64 _value) {
@@ -205,6 +210,4 @@ contract IntegralAuction is BringYourOwnWhitelist {
         uint256 _bidderShare = auction.value.sub(_feeShare);
         return (_feeShare, _bidderShare);
     }
-
-    function distribute(bytes32 _auctionId) internal;
 }
