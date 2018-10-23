@@ -57,6 +57,8 @@ contract IntegralAuction is BringYourOwnWhitelist {
         manager = _manager;
     }
 
+    function ensureFunding(address _asset, uint256 _value) internal;
+
     /// @notice                 Seller opens auction by committing ethereum
     /// @param _partialTx       Seller's partial transaction
     /// @param _reservePrice    Minimum acceptable bid (sats)
@@ -65,11 +67,12 @@ contract IntegralAuction is BringYourOwnWhitelist {
     function open(
         bytes _partialTx,
         uint256 _reservePrice,
-        uint256 _reqDiff
+        uint256 _reqDiff,
+        address _asset,
+        uint256 _value
     ) public payable returns (bytes32) {
 
-        // Require Seller to fund tx
-        require(msg.value > 0, "No asset received. Auction must be funded on initialization.");
+        ensureFunding(_asset, _value);
 
         // Auction identifier is keccak256 of Seller's parital transaction
         bytes32 _auctionId = keccak256(_partialTx.slice(7, 36));
@@ -79,7 +82,8 @@ contract IntegralAuction is BringYourOwnWhitelist {
 
         // Add to auctions mapping
         auctions[_auctionId].state = AuctionStates.ACTIVE;
-        auctions[_auctionId].value = msg.value;
+        auctions[_auctionId].value = _value;
+        auctions[_auctionId].asset = _asset;
         auctions[_auctionId].seller = msg.sender;
         auctions[_auctionId].reqDiff = _reqDiff;
 
@@ -87,7 +91,14 @@ contract IntegralAuction is BringYourOwnWhitelist {
         openPositions[msg.sender] = openPositions[msg.sender].add(1);
 
         // Emit AuctionActive event
-        emit AuctionActive(_auctionId, msg.sender, address(0), msg.value, _partialTx, _reservePrice, _reqDiff);
+        emit AuctionActive(
+            _auctionId,
+            msg.sender,
+            _asset,
+            _value,
+            _partialTx,
+            _reservePrice,
+            _reqDiff);
 
         return _auctionId;
     }
@@ -105,6 +116,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     ) public returns (bool) {
         bytes32 _auctionId = keccak256(_tx.slice(7, 36));
         Auction storage _auction = auctions[_auctionId];
+        
         bytes32 _txid;
         address _bidder;
         uint64 _value;
@@ -126,7 +138,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         _auction.state = AuctionStates.CLOSED;
         _auction.BTCvalue = _value;
 
-        distributeEther(_auctionId);
+        distribute(_auctionId);
 
         // Decrement Open positions
         openPositions[_auction.seller] = openPositions[_auction.seller].sub(1);
@@ -136,7 +148,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
             _auctionId,
             _auction.seller,
             _auction.bidder,
-            address(0),
+            _auction.asset,
             _auction.value,
             _value
         );
@@ -194,16 +206,5 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return (_feeShare, _bidderShare);
     }
 
-    function distributeEther(bytes32 _auctionId) internal returns (bool) {
-        // Calculate fee and bidder shares
-        uint256 _feeShare;
-        uint256 _bidderShare;
-        (_feeShare, _bidderShare) = allocate(_auctionId);
-
-        // Transfer fee
-        address(manager).transfer(_feeShare);
-
-        // Transfer eth to selected bidder
-        address(auctions[_auctionId].bidder).transfer(_bidderShare);
-    }
+    function distribute(bytes32 _auctionId) internal;
 }

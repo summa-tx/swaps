@@ -5,7 +5,7 @@ const web3 = new Web3(ganache.provider());
 const compiledBTCUtils = require('../build/BTCUtils.json');
 const compiledBytes = require('../build/BytesLib.json');
 const compiledSPV = require('../build/ValidateSPV.json')
-const compiledIAC = require('../build/IntegralAuction.json');
+const compiledIAC = require('../build/IntegralAuctionEth.json');
 const linker = require('solc/linker');
 const utils = require('./utils');
 const constants = require('./constants');
@@ -14,6 +14,8 @@ const constants = require('./constants');
 // Suppress web3 MaxListenersExceededWarning
 var listeners = process.listeners('warning');
 listeners.forEach(listener => process.removeListener('warning', listener));
+
+const ETHER = web3.utils.toWei('1', 'ether')
 
 let accounts;
 let manager;
@@ -65,7 +67,7 @@ const constructIAC = async () => {
         .send({ from: manager, gas: gas, gasPrice: gasPrice});
 };
 
-describe('IntegralAuction', () => {
+describe('IntegralAuctionETH', () => {
     let iac;
     let aucId;
     let addAucRes;
@@ -79,7 +81,7 @@ describe('IntegralAuction', () => {
         iac = await constructIAC();
         assert.ok(iac.options.address);
 
-        await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
+        await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
             .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
             .then(res => {
                 addAucRes = res;
@@ -114,23 +116,45 @@ describe('IntegralAuction', () => {
         });
 
         it('errors if auction was not funded', async () => {
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
                 .send({from: seller, value: 0, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
                     assert(
-                        e.message.search('No asset received. Auction must be funded on initialization.') >= 1
+                        e.message.indexOf('No asset received. Auction must be funded on initialization.') >= 1
+                    );
+                });
+        });
+
+        it('errors if asset is not address0', async () => {
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, manager, ETHER)
+                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.indexOf('asset must be zero address for ether auctions.') >= 1
+                    );
+                });
+        });
+
+        it('errors if value is not equal to message.value', async () => {
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
+                .send({from: seller, value: 10 ** 11, gas: gas, gasPrice: gasPrice})
+                .then(() => assert(false))
+                .catch(e => {
+                    assert(
+                        e.message.indexOf('value must equal msg.value') >= 1
                     );
                 });
         });
 
         it('errors if auction already exists', async () => {
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100)
+            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
                 .then(() => assert(false))
                 .catch(e => {
                     assert(
-                        e.message.search('Auction exists.') >= 1
+                        e.message.indexOf('Auction exists.') >= 1
                     );
                 });
         });
@@ -154,7 +178,7 @@ describe('IntegralAuction', () => {
                 .then(() => assert(false))
                 .catch(e => {
                     assert(
-                        e.message.search('Bidder is not whitelisted.') >= 1
+                        e.message.indexOf('Bidder is not whitelisted.') >= 1
                     );
                 });
         });
@@ -201,13 +225,13 @@ describe('IntegralAuction', () => {
                 .then(() => assert(false))
                 .catch(e => {
                     assert(
-                        e.message.search('Auction has closed or does not exist.') >= 1
+                        e.message.indexOf('Auction has closed or does not exist.') >= 1
                     );
                 });
         });
 
         it('errors if total difficulty sum is too low', async () => {
-            await iac.methods.open(constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100)
+            await iac.methods.open(constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
 
             await iac.methods.claim(constants.WORK_TOO_LOW.OP_RETURN_TX, constants.WORK_TOO_LOW.PROOF, constants.WORK_TOO_LOW.PROOF_INDEX, constants.WORK_TOO_LOW.HEADER_CHAIN)
@@ -215,12 +239,12 @@ describe('IntegralAuction', () => {
                 .then(() => {assert(false)})
                 .catch(e => {
                     assert(
-                        e.message.search('Not enough difficulty in header chain.') >= 1
+                        e.message.indexOf('Not enough difficulty in header chain.') >= 1
                     );
                 });
         });
         it('errors if nOutputs is less than two', async () => {
-            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0)
+            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
 
             await iac.methods.claim(constants.FEW_OUTPUTS.OP_RETURN_TX, constants.FEW_OUTPUTS.PROOF, constants.FEW_OUTPUTS.PROOF_INDEX, constants.FEW_OUTPUTS.HEADER_CHAIN)
@@ -228,12 +252,12 @@ describe('IntegralAuction', () => {
                 .then(() => {assert(false)})
                 .catch(e => {
                     assert(
-                        e.message.search('Must have at least 2 TxOuts') >= 1
+                        e.message.indexOf('Must have at least 2 TxOuts') >= 1
                     );
                 });
         });
         it('errors if second output is not OP_RETURN', async () => {
-            await iac.methods.open(constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0)
+            await iac.methods.open(constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER)
                 .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
 
             await iac.methods.claim(constants.OP_RETURN_WRONG.OP_RETURN_TX, constants.OP_RETURN_WRONG.PROOF, constants.OP_RETURN_WRONG.PROOF_INDEX, constants.OP_RETURN_WRONG.HEADER_CHAIN)
@@ -243,7 +267,7 @@ describe('IntegralAuction', () => {
                 })
                 .catch(e => {
                     assert(
-                        e.message.search('Not an OP_RETURN output') >= 1
+                        e.message.indexOf('Not an OP_RETURN output') >= 1
                     );
                 });
         });
