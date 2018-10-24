@@ -15,6 +15,15 @@ const BytesPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'BytesLib.sol
 const SafeMathPath = path.resolve(__dirname, 'bitcoin-spv/contracts', 'SafeMath.sol')
 const WhitelistPath = path.resolve(__dirname, 'contracts', 'BringYourOwnWhitelist.sol')
 const IntegralAuctionPath = path.resolve(__dirname, 'contracts', 'IntegralAuction.sol')
+const Auction20Path = path.resolve(__dirname, 'contracts', 'IntegralAuction20.sol')
+const Auction721Path = path.resolve(__dirname, 'contracts', 'IntegralAuction721.sol')
+const AuctionETHPath = path.resolve(__dirname, 'contracts', 'IntegralAuctionETH.sol')
+const IERC20Path = path.resolve(__dirname, 'contracts', 'interfaces', 'IERC20.sol')
+const IERC721Path = path.resolve(__dirname, 'contracts', 'interfaces', 'IERC721.sol')
+const AuctionDummyPath = path.resolve(__dirname, 'test', 'contracts', 'DummyAuction.sol')
+const DummyERC20Path = path.resolve(__dirname, 'test', 'contracts', 'DummyERC20.sol')
+const DummyERC721Path = path.resolve(__dirname, 'test', 'contracts', 'DummyERC721.sol')
+
 
 let input = {
     'SPVStore.sol': fs.readFileSync(SPVStorePath, 'utf8'),
@@ -23,14 +32,29 @@ let input = {
     'BytesLib.sol': fs.readFileSync(BytesPath, 'utf8'),
     'SafeMath.sol': fs.readFileSync(SafeMathPath, 'utf8'),
     'BringYourOwnWhitelist.sol': fs.readFileSync(WhitelistPath, 'utf8'),
-    'IntegralAuction.sol': fs.readFileSync(IntegralAuctionPath, 'utf8')
+    'IntegralAuction.sol': fs.readFileSync(IntegralAuctionPath, 'utf8'),
+    'IntegralAuction20.sol': fs.readFileSync(Auction20Path, 'utf8'),
+    'IntegralAuction721.sol': fs.readFileSync(Auction721Path, 'utf8'),
+    'IntegralAuctionETH.sol': fs.readFileSync(AuctionETHPath, 'utf8'),
+    'IERC20.sol': fs.readFileSync(IERC20Path, 'utf8'),
+    'IERC721.sol': fs.readFileSync(IERC721Path, 'utf8'),
+    'DummyAuction.sol': fs.readFileSync(AuctionDummyPath, 'utf8'),
+    'DummyERC20.sol': fs.readFileSync(DummyERC20Path, 'utf8'),
+    'DummyERC721.sol': fs.readFileSync(DummyERC721Path, 'utf8')
 }
 
 const output = solc.compile({sources: input}, 1);
 
 // log errors
 if (output.errors) {
-    console.log(output.errors);
+    for (var o in output.errors) {
+        var error = output.errors[o]
+        if (error.indexOf('Dummy') === -1 || error.indexOf('Warning') === -1) {
+            console.log(error);
+            console.log(''); // blank line
+        }
+    }
+    // console.log(output.errors);
 }
 
 // Save compiled contracts to json files
