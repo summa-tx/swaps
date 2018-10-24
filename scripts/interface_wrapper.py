@@ -1,6 +1,7 @@
 import json
 from ethereum import abi, transactions
 
+
 # Loads the abi from the file
 # For some reason solc generates json stored as a string inside json
 # So we have to call .loads twice
@@ -44,7 +45,7 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
         v=0, r=0, s=0)
 
 
-def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
+def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
     '''Makes an unsigned transaction calling open
 
     Args:
@@ -52,6 +53,8 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
         reservePrice         (int): the lowest acceptable price (not enforced)
         reqDiff              (int): the amount of difficult required
                                     in the proof's header chain
+        asset               (str):  asset address
+        value               (int):  asset amount or 721 ID
         **kwargs:
             contract_address (str): address of the contract to call
             value            (int): amount of ether (in wei) to include
@@ -65,7 +68,9 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, **kwargs):
     contract_method_args = [
         partial_tx.to_bytes(),
         reservePrice,
-        reqDiff]
+        reqDiff,
+        asset,
+        value]
 
     return create_unsigned_tx(
         contract_method='open',
