@@ -76,7 +76,6 @@ describe('IntegralAuctionETH', () => {
         accounts = await web3.eth.getAccounts();
         manager = accounts[0];
         seller = accounts[1];
-        whitelistTestAccount = accounts[5];
 
         iac = await constructIAC();
         assert.ok(iac.options.address);

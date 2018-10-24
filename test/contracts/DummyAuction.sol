@@ -2,7 +2,7 @@ pragma solidity 0.4.25;
 
 import {IntegralAuction} from "./IntegralAuction.sol";
 
-contract AuctionDummy is IntegralAuction {
+contract DummyAuction is IntegralAuction {
 
     constructor (address _manager) public IntegralAuction(_manager) {}
 

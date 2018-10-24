@@ -8,6 +8,7 @@ contract IntegralAuction721 is IntegralAuction {
     constructor (address _manager) public IntegralAuction(_manager) {}
 
     function ensureFunding(address _asset, uint256 _value) internal {
+        require(msg.value == 0, 'Do not burn ether here please');
         IERC721(_asset).transferFrom(msg.sender, address(this), _value);
     }
 

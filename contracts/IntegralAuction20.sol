@@ -8,6 +8,7 @@ contract IntegralAuction20 is IntegralAuction {
     constructor (address _manager) public IntegralAuction(_manager) {}
 
     function ensureFunding(address _asset, uint256 _value) internal {
+        require(msg.value == 0, 'Do not burn ether here please');
         require(_value > 0, '_value must be greater than 0');
         require(
             IERC20(_asset).transferFrom(msg.sender, address(this), _value),
@@ -24,13 +25,15 @@ contract IntegralAuction20 is IntegralAuction {
         // send manager fee
         require(
             IERC20(auctions[_auctionId].asset).transfer(
-                manager, _feeShare)
-            );
+                manager, _feeShare),
+            'Manager transfer failed.'
+        );
 
         // send bidder proceeds
         require(
             IERC20(auctions[_auctionId].asset).transfer(
-                auctions[_auctionId].bidder, _bidderShare)
-            );
+                auctions[_auctionId].bidder, _bidderShare),
+            'Bidder transfer failed.'
+        );
     }
 }
