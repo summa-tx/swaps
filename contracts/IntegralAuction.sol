@@ -158,9 +158,10 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return true;
     }
 
-    /// @notice             Validated selected bid, bidder claims eth
+    /// @notice             Validates the submitted bid transaction
+    /// @dev                Uses bitcoin parsing tools. This could be made more gas efficient
     /// @param _tx          The raw byte tx
-    /// @return             true if bid is successfully accepted, error otherwise
+    /// @return             The txid, the bidder's ethereum address, and the value of the first output
     function checkTx(
         bytes _tx
     ) public pure returns (bytes32 _txid, address _bidder, uint64 _value) {
@@ -178,6 +179,11 @@ contract IntegralAuction is BringYourOwnWhitelist {
         _value = _tx.extractOutputAtIndex(0).extractValue();
     }
 
+    /// @notice             Validates submitted header chain
+    /// @dev                Checks that all headers are linked, that each meets its target difficulty
+    /// @param _headers     The raw byte header chain
+    /// @param _reqDiff     The required total difficulty for the header chain
+    /// @return             The total difficulty of the header chain, and the first header's tx tree root
     function checkHeaders(
         bytes _headers,
         uint256 _reqDiff
@@ -191,6 +197,13 @@ contract IntegralAuction is BringYourOwnWhitelist {
         require(_diff >= _reqDiff, 'Not enough difficulty in header chain.');
     }
 
+    /// @notice             Validates submitted merkle inclusion proof
+    /// @dev                Takes in the x
+    /// @param _txid        The 32 byte txid
+    /// @param _merkleRoot  The block header's merkle root
+    /// @param _proof       The inclusion proof
+    /// @param _index       The index of the txid in the leaf set
+    /// @return             true if _proof and _index show that _txid is in the _merkleRoot, else false
     function checkProof(
         bytes32 _txid,
         bytes32 _merkleRoot,
@@ -201,7 +214,10 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return true;
     }
 
-
+    /// @notice             Calculates the manager's fee
+    /// @dev                Looks up the auction and calculates a 25bps fee. Do not use for erc721.
+    /// @param _auctionId   The 32 byte keccak256 of the auction outpoint
+    /// @return             The fee share and the bidder's share
     function allocate(bytes32 _auctionId) public view returns (uint256, uint256) {
         Auction storage auction = auctions[_auctionId];
         // Fee share
