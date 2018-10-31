@@ -1,6 +1,6 @@
 import json
 from ethereum import abi, transactions
-
+from ethereum.transactions import rlp
 
 # Loads the abi from the file
 # For some reason solc generates json stored as a string inside json
@@ -35,14 +35,14 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
     tx_data = ct.encode(contract_method, contract_method_args)
 
     # Transaction instance, unsigned
-    return transactions.Transaction(
+    return rlp.encode(transactions.Transaction(
         nonce=nonce,
         gasprice=gas_price,
         startgas=start_gas,
         to=contract_address,
         value=value,
         data=tx_data,
-        v=0, r=0, s=0)
+        v=0, r=0, s=0)).hex()
 
 
 def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
@@ -57,7 +57,6 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
         value               (int):  asset amount or 721 ID
         **kwargs:
             contract_address (str): address of the contract to call
-            value            (int): amount of ether (in wei) to include
             nonce            (int): number of transactions already sent by
                                     signing account
             gas_price        (int): gas price
@@ -75,6 +74,7 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
     return create_unsigned_tx(
         contract_method='open',
         contract_method_args=contract_method_args,
+        value=value,
         **kwargs)
 
 
