@@ -10,8 +10,8 @@ with open('build/IntegralAuction.json', 'r') as jsonfile:
     ABI = json.loads(j['interface'])
 
 
-def create_unsigned_tx(contract_method, contract_method_args, contract_address,
-                       value=0, nonce=0, gas_price=20, start_gas=500000):
+def create_unsigned_tx(contract_address, tx_data, value=0, nonce=0,
+                       gas_price=20, start_gas=500000):
     '''Creates an unsigned contract call transaction.
     Args:
         contract_method         (str): name of contract method to call
@@ -28,12 +28,6 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
     Returns:
         (Transaction instance): unsigned transaction
     '''
-    # ContractTranslator instance used to encode and decode contract data
-    ct = abi.ContractTranslator(ABI)
-
-    # Encode contract method
-    tx_data = ct.encode(contract_method, contract_method_args)
-
     # Transaction instance, unsigned
     return rlp.encode(transactions.Transaction(
         nonce=nonce,
@@ -43,6 +37,51 @@ def create_unsigned_tx(contract_method, contract_method_args, contract_address,
         value=value,
         data=tx_data,
         v=0, r=0, s=0)).hex()
+
+
+def create_open_data(partial_tx, reservePrice, reqDiff, asset, value):
+    '''Makes an data blob for calling open
+
+    Args:
+        partial_tx (riemann.tx.Tx): the partial transaction to submit
+        reservePrice         (int): the lowest acceptable price (not enforced)
+        reqDiff              (int): the amount of difficult required
+                                    in the proof's header chain
+        asset               (str):  asset address
+        value               (int):  asset amount or 721 ID
+
+    Returns:
+        (bytes): the data blob
+    '''
+    ct = abi.ContractTranslator(ABI)
+    contract_method_args = [
+        partial_tx.to_bytes(),
+        reservePrice,
+        reqDiff,
+        asset,
+        value]
+    return ct.encode('open', contract_method_args)
+
+
+def create_claim_data(tx, proof, index, headers):
+    '''Makes an unsigned transaction calling claim
+
+    Args:
+        tx (riemann.tx.Tx): the fully signed tx
+        proof        (str): the merkle inclusion proof
+        index        (int): the index of the tx for merkle verification
+        headers      (str): the header chain containing work
+
+    Returns:
+        (bytes): the data blob
+    '''
+    ct = abi.ContractTranslator(ABI)
+    contract_method_args = [
+        tx.to_bytes(),
+        bytes.fromhex(proof),
+        index,
+        bytes.fromhex(headers)]
+    return ct.encode('claim', contract_method_args)
 
 
 def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
@@ -64,16 +103,9 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
-    contract_method_args = [
-        partial_tx.to_bytes(),
-        reservePrice,
-        reqDiff,
-        asset,
-        value]
-
+    tx_data = create_open_data(partial_tx, reservePrice, reqDiff, asset, value)
     return create_unsigned_tx(
-        contract_method='open',
-        contract_method_args=contract_method_args,
+        tx_data=tx_data,
         value=value,
         **kwargs)
 
@@ -97,13 +129,7 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
-    contract_method_args = [
-        tx.to_bytes(),
-        bytes.fromhex(proof),
-        index,
-        bytes.fromhex(headers)]
-
+    tx_data = create_claim_data(tx, proof, index, headers)
     return create_unsigned_tx(
-        contract_method='claim',
-        contract_method_args=contract_method_args,
+        tx_data=tx_data,
         **kwargs)
