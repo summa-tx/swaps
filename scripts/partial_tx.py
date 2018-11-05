@@ -123,3 +123,68 @@ def dutch(tx_id, index, prevout_value, recipient_addr,
                       t[0], t[1], keypair)
         ret.append(txn)
     return ret
+
+
+def dutch_as_hex(tx_id, index, prevout_value, recipient_addr,
+                 format_tuples, keypair):
+    '''
+    Makes a dutch auction given a list representing the format
+
+    Args:
+        tx_id                           (str): txid of parent tx
+        index                           (int): index of input in parent tx
+        prevout_value                   (int): value in satoshi of the input
+        recipient_addr                  (str): address of the recipient
+        format_tuples (list(tuple(int, int))): tuples of value and timelock
+        keypair             (tuple(str, str)): privkey as hex, pubkey as hex
+    Returns:
+        str: The signed transactions as a hex blob
+    '''
+    txns = dutch(tx_id, index, prevout_value, recipient_addr,
+                 format_tuples, keypair)
+    b = bytearray()
+    for t in txns:
+        b.extend(t)
+    return b.hex()
+
+
+def multidutch(prevouts, recipient_addr, format_tuples, keypair):
+    '''
+    Makes identical dutch auctions for each outpoint in a list of outpoints
+
+    Args:
+        prevouts (list(tuple(str, str, int))): tuple of txid, index, value
+        recipient_addr                  (str): address of the recipient
+        format_tuples (list(tuple(int, int))): tuples of value and timelock
+        keypair             (tuple(str, str)): privkey as hex, pubkey as hex
+    Returns:
+        list(list(riemann.tx.Tx)): The signed transactions
+    '''
+    ret = []
+    for p in prevouts:
+        d = dutch(p[0], p[1], p[2], recipient_addr,
+                  format_tuples, keypair)
+        ret.append(d)
+    return ret
+
+
+def multidutch_as_hex(prevouts, recipient_addr, format_tuples, keypair):
+    '''
+    Makes identical dutch auctions for each outpoint in a list of outpoints
+
+    Args:
+        prevouts (list(tuple(str, str, int))): tuple of txid, index, value
+        recipient_addr                  (str): address of the recipient
+        format_tuples (list(tuple(int, int))): tuples of value and timelock
+        keypair             (tuple(str, str)): privkey as hex, pubkey as hex
+    Returns:
+        list(str): A list of dutch partial_tx blobs
+    '''
+    dutches = multidutch(prevouts, recipient_addr, format_tuples, keypair)
+    ret = []
+    for d in dutches:
+        b = bytearray()
+        for t in d:
+            b.extend(t)
+        ret.append(b.hex())
+    return ret
