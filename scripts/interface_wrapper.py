@@ -43,19 +43,19 @@ def create_open_data(partial_tx, reservePrice, reqDiff, asset, value):
     '''Makes an data blob for calling open
 
     Args:
-        partial_tx (riemann.tx.Tx): the partial transaction to submit
-        reservePrice         (int): the lowest acceptable price (not enforced)
-        reqDiff              (int): the amount of difficult required
+        partial_tx   (str): the partial transaction to submit
+        reservePrice (int): the lowest acceptable price (not enforced)
+        reqDiff      (int): the amount of difficult required
                                     in the proof's header chain
-        asset               (str):  asset address
-        value               (int):  asset amount or 721 ID
+        asset        (str):  asset address
+        value        (int):  asset amount or 721 ID
 
     Returns:
         (bytes): the data blob
     '''
     ct = abi.ContractTranslator(ABI)
     contract_method_args = [
-        partial_tx.to_bytes(),
+        bytes.fromhex(partial_tx),
         reservePrice,
         reqDiff,
         asset,
@@ -103,7 +103,8 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
-    tx_data = create_open_data(partial_tx, reservePrice, reqDiff, asset, value)
+    tx_data = create_open_data(
+        partial_tx.hex(), reservePrice, reqDiff, asset, value)
     return create_unsigned_tx(
         tx_data=tx_data,
         value=value,

@@ -2,24 +2,6 @@ import scripts.utils as utils
 from riemann import simple, tx
 from riemann import utils as rutils
 
-# block explorer:
-# 6e83370f4ef9edd11d56df0554e439cb79272d80bb114db426105f55ce723c89
-# test_privkey = \
-#     'cf3ab75cde557c505f359148e6438ea081280c752a338382c7a1ea974a090ce7'
-#
-# JAMES = 'bc1qkn3r0ms2wjc08nu6tt2pvfauclurl9y458ycqr'
-#
-# priv = utils.coerce_key(test_privkey)
-# pub = utils.to_pubkey(priv).hex()
-# test_keypair = (test_privkey, pub)
-#
-# # bc1qlkmj7zln5qqxypqxl8dsurfccazhpqp0w28mm5
-# address = addr.make_p2wpkh_address(bytes.fromhex(pub))
-#
-# # 1976a914fdb72f0bf3a000620406f9db0e0d38c74570802f88ac
-# pkh = rutils.hash160(bytes.fromhex(pub))
-# output_script = b'\x19\x76\xa9\x14' + pkh + b'\x88\xac'
-
 
 def make_partial_tx(outpoint, output_value, output_address,
                     lock_time=0):

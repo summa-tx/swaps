@@ -5,6 +5,7 @@ def generate_small_utxos(tx_id, index, prevout_value, recipient_addr,
                          num_outputs, fee, change_addr, size=550):
     '''
     Makes new utxos. Useful for multidutch, or pre-stocking an app
+    All utxos have the same address (i.e. the same keypair)
 
     Args:
         tx_id          (str): txid of parent tx
@@ -17,6 +18,7 @@ def generate_small_utxos(tx_id, index, prevout_value, recipient_addr,
     Returns:
         (rieman.tx.Tx): The unsigned tx making num_outputs new UTXOs
     '''
+    # Make the input
     outpoint = simple.outpoint(tx_id, index)
     tx_ins = [simple.unsigned_input(outpoint)]
 

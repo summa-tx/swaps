@@ -1,2 +1,3 @@
 node_modules/
 build/
+scripts/nft_auction_setup.py
