@@ -2,3 +2,4 @@ node_modules/
 build/
 scripts/nft_auction_setup.py
 scripts/eth_auction_setup.py
+__pycache__/
