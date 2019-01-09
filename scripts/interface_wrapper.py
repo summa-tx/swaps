@@ -1,6 +1,8 @@
 import json
 from ethereum import abi, transactions
 from ethereum.transactions import rlp
+from ethereum.utils import privtoaddr, normalize_key, ecsign, sha3
+
 
 # Loads the abi from the file
 # For some reason solc generates json stored as a string inside json
@@ -29,14 +31,14 @@ def create_unsigned_tx(contract_address, tx_data, value=0, nonce=0,
         (Transaction instance): unsigned transaction
     '''
     # Transaction instance, unsigned
-    return rlp.encode(transactions.Transaction(
+    return transactions.Transaction(
         nonce=nonce,
         gasprice=gas_price,
         startgas=start_gas,
         to=contract_address,
         value=value,
         data=tx_data,
-        v=0, r=0, s=0)).hex()
+        v=0, r=0, s=0)
 
 
 def create_open_data(partial_tx, reservePrice, reqDiff, asset, value):
@@ -67,8 +69,8 @@ def create_claim_data(tx, proof, index, headers):
     '''Makes an unsigned transaction calling claim
 
     Args:
-        tx (riemann.tx.Tx): the fully signed tx
-        proof        (str): the merkle inclusion proof
+        tx         (bytes): the fully signed tx
+        proof      (bytes): the merkle inclusion proof
         index        (int): the index of the tx for merkle verification
         headers      (str): the header chain containing work
 
@@ -77,10 +79,10 @@ def create_claim_data(tx, proof, index, headers):
     '''
     ct = abi.ContractTranslator(ABI)
     contract_method_args = [
-        tx.to_bytes(),
-        bytes.fromhex(proof),
+        tx,
+        proof,
         index,
-        bytes.fromhex(headers)]
+        headers]
     return ct.encode('claim', contract_method_args)
 
 
@@ -88,7 +90,7 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
     '''Makes an unsigned transaction calling open
 
     Args:
-        partial_tx (riemann.tx.Tx): the partial transaction to submit
+        partial_tx           (str): the partial transaction to submit
         reservePrice         (int): the lowest acceptable price (not enforced)
         reqDiff              (int): the amount of difficult required
                                     in the proof's header chain
@@ -104,7 +106,7 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
         (ethereum.transactions.Transaction): the unsigned tx
     '''
     tx_data = create_open_data(
-        partial_tx.hex(), reservePrice, reqDiff, asset, value)
+        partial_tx, reservePrice, reqDiff, asset, value)
     return create_unsigned_tx(
         tx_data=tx_data,
         value=value,
@@ -115,7 +117,7 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
     '''Makes an unsigned transaction calling claim
 
     Args:
-        tx (riemann.tx.Tx): the fully signed tx
+        tx         (bytes): the fully signed tx
         proof        (str): the merkle inclusion proof
         index        (int): the index of the tx for merkle verification
         headers      (str): the header chain containing work
@@ -134,3 +136,26 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
     return create_unsigned_tx(
         tx_data=tx_data,
         **kwargs)
+
+
+def sign(tx, key, network_id=1):
+    """Sign this transaction with a private key.
+    A potentially already existing signature would be overridden.
+    """
+
+    rlpdata = transactions.rlp.encode(
+        rlp.infer_sedes(
+            tx).serialize(tx)[:-3] + [network_id, b'', b''])
+    rawhash = sha3(rlpdata)
+
+    key = normalize_key(key)
+
+    v, r, s = ecsign(rawhash, key)
+    if network_id is not None:
+        v += 8 + network_id * 2
+
+    ret = tx.copy(
+        v=v, r=r, s=s
+    )
+    ret._sender = privtoaddr(key)
+    return ret

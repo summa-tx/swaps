@@ -6,11 +6,12 @@ name = "pypi"
 [dev-packages]
 
 [packages]
-ethereum = "*"
-riemann-tx = ">=1.1.1"
+ethereum = "==2.3.2"
+riemann-tx = ">=1.1.6"
 ecdsa = "*"
 pycryptodomex = "*"
 ipython = "*"
+connectrum = "*"
 
 [requires]
 python_version = "3.6"
