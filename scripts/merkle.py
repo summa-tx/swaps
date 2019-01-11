@@ -93,7 +93,7 @@ def make_ether_txn(
         headers=bytes.fromhex(headers),
         nonce=nonce,
         contract_address=contract_address,
-        gas_price=15,
+        gas_price=15 * 1000000000,  # 15 GWEI
         start_gas=1000000,
         value=0)
 

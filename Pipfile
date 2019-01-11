@@ -4,6 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [dev-packages]
+mypy = "*"
+"flake8" = "*"
 
 [packages]
 ethereum = "==2.3.2"
@@ -12,6 +14,7 @@ ecdsa = "*"
 pycryptodomex = "*"
 ipython = "*"
 connectrum = "*"
+eth-account = "*"
 
 [requires]
 python_version = "3.6"
