@@ -8,7 +8,7 @@ import asyncio
 
 from ethereum import transactions
 
-# import riemann
+import riemann
 import riemann.tx as tx
 import riemann.utils as rutils
 import riemann.simple as simple
@@ -37,11 +37,13 @@ def make_several_auctions(
         prevout_value: int,
         start_nonce: int,
         contract_address: str,
+        reqDiff: int,
         eth_value: int,
         eth_privkey: str,
         num_auctions: int,
         recipient: str,
-        form: List[Tuple[int, int]]) -> Tuple[tx.Tx, List[str], List[str]]:
+        form: List[Tuple[int, int]],
+        network_id: int = 1) -> Tuple[tx.Tx, List[str], List[str]]:
     '''
     Args:
         tx_id         (str): A txid containing an output held by ADDRESS
@@ -53,10 +55,13 @@ def make_several_auctions(
         recipient     (str): the bitcoin address to send proceeds to
         form    list(tuple): the price/timelock tuples for the auctions
     Returns:
-        tuple(riemann.tx.Tx, List(str)):
-            the Bitcoin tx and the Ethereum txns
+        tuple(riemann.tx.Tx, List(str), List(str)):
+            the Bitcoin tx,
+            the ether data blobs,
+            and the signed Ethereum txns
     '''
-
+    if network_id != 1:
+        riemann.select_network('bitcoin_test')
     split_tx = make_and_sign_split_tx(
         tx_id=tx_id,
         index=index,
@@ -78,7 +83,7 @@ def make_several_auctions(
     ether_blobs = [iw.create_open_data(
         partial_tx=p[0],
         reservePrice=1000000,
-        reqDiff=(7184404942701 * 5),
+        reqDiff=reqDiff,
         asset=ETH_ZERO_ADDRESS,
         value=eth_value
     ).hex() for p in zip(partial_txns, range(len(partial_txns)))]
@@ -86,7 +91,7 @@ def make_several_auctions(
     unsigned_ether = [iw.create_open_tx(
         partial_tx=p[0],
         reservePrice=1000000,
-        reqDiff=(7184404942701 * 5),
+        reqDiff=reqDiff,
         asset=ETH_ZERO_ADDRESS,
         value=eth_value,
         nonce=start_nonce + p[1],
@@ -96,7 +101,8 @@ def make_several_auctions(
     ) for p in zip(partial_txns, range(len(partial_txns)))]
 
     signed_ether_txns = [
-        transactions.rlp.encode(iw.sign(tx, eth_privkey)).hex()
+        transactions.rlp.encode(
+            iw.sign(tx, eth_privkey, network_id=network_id)).hex()
         for tx in unsigned_ether
     ]
 
