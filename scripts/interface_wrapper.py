@@ -1,8 +1,6 @@
 import json
-from ethereum import abi, transactions
-from ethereum.transactions import rlp
-from ethereum.utils import privtoaddr, normalize_key, ecsign, sha3
 
+from ether import calldata, transactions
 
 # Loads the abi from the file
 # For some reason solc generates json stored as a string inside json
@@ -12,8 +10,14 @@ with open('build/IntegralAuction.json', 'r') as jsonfile:
     ABI = json.loads(j['interface'])
 
 
-def create_unsigned_tx(contract_address, tx_data, value=0, nonce=0,
-                       gas_price=20, start_gas=500000):
+def create_unsigned_tx(
+        contract_address: str,
+        value=0,
+        start_gas=500000,
+        gas_price=20,
+        nonce=0,
+        tx_data: bytes = b'',
+        network_id: int = 1) -> transactions.UnsignedEthTx:
     '''Creates an unsigned contract call transaction.
     Args:
         contract_method         (str): name of contract method to call
@@ -31,17 +35,22 @@ def create_unsigned_tx(contract_address, tx_data, value=0, nonce=0,
         (Transaction instance): unsigned transaction
     '''
     # Transaction instance, unsigned
-    return transactions.Transaction(
-        nonce=nonce,
-        gasprice=gas_price,
-        startgas=start_gas,
+    return transactions.UnsignedEthTx(
         to=contract_address,
         value=value,
+        gas=start_gas,
+        gasPrice=gas_price,
+        nonce=nonce,
         data=tx_data,
-        v=0, r=0, s=0)
+        chainId=network_id)
 
 
-def create_open_data(partial_tx, reservePrice, reqDiff, asset, value):
+def create_open_data(
+        partial_tx: str,
+        reservePrice: int,
+        reqDiff: int,
+        asset: str,
+        value: int):
     '''Makes an data blob for calling open
 
     Args:
@@ -55,14 +64,13 @@ def create_open_data(partial_tx, reservePrice, reqDiff, asset, value):
     Returns:
         (bytes): the data blob
     '''
-    ct = abi.ContractTranslator(ABI)
     contract_method_args = [
         bytes.fromhex(partial_tx),
         reservePrice,
         reqDiff,
         asset,
         value]
-    return ct.encode('open', contract_method_args)
+    return calldata.call('open', contract_method_args, ABI)
 
 
 def create_claim_data(tx, proof, index, headers):
@@ -77,16 +85,21 @@ def create_claim_data(tx, proof, index, headers):
     Returns:
         (bytes): the data blob
     '''
-    ct = abi.ContractTranslator(ABI)
     contract_method_args = [
         tx,
         proof,
         index,
         headers]
-    return ct.encode('claim', contract_method_args)
+    return calldata.call('claim', contract_method_args, ABI)
 
 
-def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
+def create_open_tx(
+        partial_tx: str,
+        reservePrice: int,
+        reqDiff: int,
+        asset: str,
+        value: int,
+        **kwargs):
     '''Makes an unsigned transaction calling open
 
     Args:
@@ -102,6 +115,8 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
                                     signing account
             gas_price        (int): gas price
             start_gas        (int): gas limit
+            network_id       (int): ethereum network id
+
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
     '''
@@ -113,7 +128,12 @@ def create_open_tx(partial_tx, reservePrice, reqDiff, asset, value, **kwargs):
         **kwargs)
 
 
-def create_claim_tx(tx, proof, index, headers, **kwargs):
+def create_claim_tx(
+        tx: bytes,
+        proof: bytes,
+        index: int,
+        headers: bytes,
+        **kwargs):
     '''Makes an unsigned transaction calling claim
 
     Args:
@@ -128,6 +148,7 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
                                     signing account
             gas_price        (int): gas price
             start_gas        (int): gas limit
+            network_id       (int): ethereum network id
 
     Returns:
         (ethereum.transactions.Transaction): the unsigned tx
@@ -138,24 +159,11 @@ def create_claim_tx(tx, proof, index, headers, **kwargs):
         **kwargs)
 
 
-def sign(tx, key, network_id=1):
+def sign(
+        tx: transactions.UnsignedEthTx,
+        key: bytes) -> transactions.SignedEthTx:
     """Sign this transaction with a private key.
     A potentially already existing signature would be overridden.
     """
 
-    rlpdata = transactions.rlp.encode(
-        rlp.infer_sedes(
-            tx).serialize(tx)[:-3] + [network_id, b'', b''])
-    rawhash = sha3(rlpdata)
-
-    key = normalize_key(key)
-
-    v, r, s = ecsign(rawhash, key)
-    if network_id is not None:
-        v += 8 + network_id * 2
-
-    ret = tx.copy(
-        v=v, r=r, s=s
-    )
-    ret._sender = privtoaddr(key)
-    return ret
+    return transactions.sign_transaction(tx, key)

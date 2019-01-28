@@ -6,12 +6,12 @@ import scripts.merkle as merkle
 
 import asyncio
 
-from ethereum import transactions
-
 import riemann
 import riemann.tx as tx
 import riemann.utils as rutils
 import riemann.simple as simple
+
+from ether import transactions
 
 from typing import List, Tuple
 
@@ -98,12 +98,13 @@ def make_several_auctions(
         nonce=start_nonce + p[1],
         gas_price=15 * GWEI,
         start_gas=500000,
-        contract_address=contract_address
+        contract_address=contract_address,
+        network_id=network_id
     ) for p in zip(partial_txns, range(len(partial_txns)))]
 
     signed_ether_txns = [
-        transactions.rlp.encode(
-            iw.sign(tx, eth_privkey, network_id=network_id)).hex()
+        transactions.serialize(
+            iw.sign(tx, bytes.fromhex(eth_privkey)))
         for tx in unsigned_ether
     ]
 
@@ -345,5 +346,5 @@ def make_ethereum_settlement_transactions(
         for i in range(len(bitcoin_txids))]
     task = asyncio.gather(*coros)
     txns = asyncio.get_event_loop().run_until_complete(task)
-    signed = [iw.sign(txn, eth_privkey) for txn in txns]
-    return [transactions.rlp.encode(txn).hex() for txn in signed]
+    signed = [iw.sign(txn, bytes.fromhex(eth_privkey)) for txn in txns]
+    return [transactions.serialize(txn) for txn in signed]

@@ -8,13 +8,13 @@ mypy = "*"
 "flake8" = "*"
 
 [packages]
-ethereum = "==2.3.2"
 riemann-tx = ">=1.1.6"
 ecdsa = "*"
 pycryptodomex = "*"
 ipython = "*"
 connectrum = "*"
 eth-account = "*"
+riemann-ether = "*"
 
 [requires]
 python_version = "3.6"

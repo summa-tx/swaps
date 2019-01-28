@@ -10,9 +10,9 @@ from connectrum.client import StratumClient
 from riemann import tx
 from riemann import utils as rutils
 
-from ethereum import transactions
+from ether.transactions import UnsignedEthTx
 
-from typing import Tuple, Union
+from typing import cast, Tuple, Union
 
 with open('build/ValidateSPV.json', 'r') as jsonfile:
     j = json.loads(jsonfile.read())
@@ -73,10 +73,13 @@ async def setup_client():
 
 
 async def broadcast(t: Union[tx.Tx, str]):
+    '''
+    broadcasts a bitcoin transaction. accepts an object or a string
+    '''
     if type(t) is str:
-        txhex = t
+        txhex = cast(str, t)
     else:
-        txhex = t.hex()
+        txhex = cast(tx.Tx, t).hex()
 
     client = await _get_client()
     res = await client.RPC('blockchain.transaction.broadcast', txhex)
@@ -89,7 +92,7 @@ def make_ether_txn(
         index: int,
         headers: str,
         contract_address: str,
-        nonce: int) -> transactions.Transaction:
+        nonce: int) -> UnsignedEthTx:
 
     return iw.create_claim_tx(
         tx=t.to_bytes(),
@@ -104,6 +107,9 @@ def make_ether_txn(
 
 
 async def get_latest_blockheight() -> int:
+    '''
+    gets the latest blockheight that a server is aware of
+    '''
     client = await _get_client()
     fut, _ = client.subscribe('blockchain.headers.subscribe')
     block_dict = await fut
@@ -111,6 +117,9 @@ async def get_latest_blockheight() -> int:
 
 
 async def get_block_merkle_root(height: int) -> bytes:
+    '''
+    gets the merkle root of a block
+    '''
     client = await _get_client()
 
     header_dict = await client.RPC('blockchain.block.headers', height, 1)
@@ -120,15 +129,9 @@ async def get_block_merkle_root(height: int) -> bytes:
 
 
 async def get_tx_from_api(tx_id: str) -> Tuple[dict, tx.Tx]:
-    # url = 'https://chain.so/api/v2/get_tx/BTC/{}'.format(tx_id)
-    # raw_url = 'https://blockchain.info/rawtx/{}?format=hex'.format(tx_id)
-    #
-    # tx_json = requests.get(url)
-    # tx_hex = requests.get(raw_url)
-    #
-    # tx_json = json.loads(tx_json.text)
-    # t = tx.Tx.from_bytes(bytes.fromhex(tx_hex.text))
-
+    '''
+    gets a transaction from electrum and returns it as a dict and an object
+    '''
     client = await _get_client()
     tx_dict = await client.RPC('blockchain.transaction.get', tx_id, True)
     t = tx.Tx.from_hex(tx_dict['hex'])
@@ -141,8 +144,10 @@ async def get_tx_from_api(tx_id: str) -> Tuple[dict, tx.Tx]:
     return tx_dict, t
 
 
-async def get_header_chain(start_height: int,
-                           count: int) -> str:
+async def get_header_chain(start_height: int, count: int) -> str:
+    '''
+    gets headers starting at a specified height
+    '''
     client = await _get_client()
 
     res = await client.RPC(
@@ -152,6 +157,10 @@ async def get_header_chain(start_height: int,
 
 
 async def get_merkle_proof_from_api(tx_id: str, hght: int) -> Tuple[str, int]:
+    '''
+    gets a transaction inclusion proof from electrum
+    puts it into the format we expect
+    '''
     client = await _get_client()
 
     res = await client.RPC('blockchain.transaction.get_merkle', tx_id, hght)
@@ -165,7 +174,6 @@ async def get_merkle_proof_from_api(tx_id: str, hght: int) -> Tuple[str, int]:
 
     block_root = await get_block_merkle_root(hght)
 
-    # print(block_root)
     proof.extend(block_root)
 
     # NB: add 1 because our proof uses 1-indexed position
@@ -173,6 +181,9 @@ async def get_merkle_proof_from_api(tx_id: str, hght: int) -> Tuple[str, int]:
 
 
 def verify_proof(proof: bytes, index: int):
+    '''
+    verifies a merkle leaf occurs at a specified index given a merkle proof
+    '''
     index = index  # This is 1 indexed
     # TODO: making creating and verifying indexes the same
     root = proof[-32:]
@@ -208,6 +219,9 @@ async def get_that_tx(
         num_headers: int,
         contract_address: str,
         nonce: int):
+    '''
+    Makes an ethereum transaction containing a full SPV proof for a tx
+    '''
     (tx_json, t) = await get_tx_from_api(tx_id)
 
     proof, index = await get_merkle_proof_from_api(
@@ -224,6 +238,9 @@ async def get_that_tx(
 
 
 async def do_it_all(tx_id: str, num_headers: int):
+    '''
+    Gets proof info and prints it
+    '''
     (tx_json, t) = await get_tx_from_api(tx_id)
 
     proof, index = await get_merkle_proof_from_api(
