@@ -12,7 +12,7 @@ from riemann import utils as rutils
 
 from ethereum import transactions
 
-from typing import Tuple
+from typing import Tuple, Union
 
 with open('build/ValidateSPV.json', 'r') as jsonfile:
     j = json.loads(jsonfile.read())
@@ -72,9 +72,14 @@ async def setup_client():
 # # # # # # # # # # # # # # #
 
 
-async def broadcast(t: tx.Tx):
+async def broadcast(t: Union[tx.Tx, str]):
+    if type(t) is str:
+        txhex = t
+    else:
+        txhex = t.hex()
+
     client = await _get_client()
-    res = await client.RPC('blockchain.transaction.broadcast', t.hex())
+    res = await client.RPC('blockchain.transaction.broadcast', txhex)
     return res
 
 

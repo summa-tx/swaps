@@ -54,6 +54,7 @@ def make_several_auctions(
         num_auctions  (int): the number of auctions to make
         recipient     (str): the bitcoin address to send proceeds to
         form    list(tuple): the price/timelock tuples for the auctions
+        network_id    (int): ether network id, 1 for main, 3 for ropsten
     Returns:
         tuple(riemann.tx.Tx, List(str), List(str)):
             the Bitcoin tx,
@@ -339,8 +340,9 @@ def make_ethereum_settlement_transactions(
         eth_privkey: str,
         contract_address: str) -> List[str]:
     coros = [
-        merkle.get_that_tx(bitcoin_txids[i], 8, contract_address, i)
-        for i in range(start_nonce, start_nonce + len(bitcoin_txids))]
+        merkle.get_that_tx(
+            bitcoin_txids[i], 8, contract_address, i + start_nonce)
+        for i in range(len(bitcoin_txids))]
     task = asyncio.gather(*coros)
     txns = asyncio.get_event_loop().run_until_complete(task)
     signed = [iw.sign(txn, eth_privkey) for txn in txns]
