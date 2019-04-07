@@ -46,15 +46,26 @@ def make_several_auctions(
         network_id: int = 1) -> Tuple[tx.Tx, List[str], List[str]]:
     '''
     Args:
-        tx_id         (str): A txid containing an output held by ADDRESS
-        index         (int): The index controlled
-        prevout_value (int): The value of the prevout
-        start_nonce   (int): the ethereum account nonce to use in the first tx
-        eth_value     (int): the amount of ethereum in wei to sell in each auc
-        num_auctions  (int): the number of auctions to make
-        recipient     (str): the bitcoin address to send proceeds to
-        form    list(tuple): the price/timelock tuples for the auctions
-        network_id    (int): ether network id, 1 for main, 3 for ropsten
+        tx_id                            (str): A txid containing an output
+                                                held by control_addr
+        index                            (int): The index controlled
+        control_addr                     (str): the addr controlling the
+                                                outpoint described above
+        control_addr_keypair (Tuple(str, str)): the keypair to the control addr
+        prevout_value                    (int): The value of the prevout
+        start_nonce                      (int): the ethereum account nonce to
+                                                use in the first tx
+        contract_address                 (str): the ether auction contract
+        eth_value                        (int): the amount of ethereum in wei
+                                                to sell in each auc
+        eth_privkey                      (str): the privkey to an eth account
+        num_auctions                     (int): the number of auctions to make
+        recipient                        (str): the bitcoin address to send
+                                                proceeds to
+        form                       list(tuple): the price/timelock tuples for
+                                                the auctions
+        network_id                       (int): ether network id, 1 for main,
+                                                3 for ropsten
     Returns:
         tuple(riemann.tx.Tx, List(str), List(str)):
             the Bitcoin tx,
