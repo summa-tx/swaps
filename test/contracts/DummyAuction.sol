@@ -10,7 +10,11 @@ contract DummyAuction is IntegralAuction {
         require(true);
     }
 
-    function distribute(bytes32 _auctionId) internal {
+    function distribute(Auction storage _auction) internal {
         require(true);
+    }
+
+    function allocate(uint256 _value) external returns (uint256, uint256) {
+        return _allocate(_value);
     }
 }

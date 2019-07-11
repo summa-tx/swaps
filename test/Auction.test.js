@@ -45,6 +45,7 @@ const constructIAC = async () => {
     let btcUtilsContract = await new web3.eth.Contract(JSON.parse(compiledBTCUtils.interface))
         .deploy({ data: linkedCode })
         .send({ from: manager, gas: gas, gasPrice: gasPrice});
+      console.log(2)
 
     // Link
     linkedCode = await linker.linkBytecode(compiledSPV.bytecode,
@@ -55,6 +56,7 @@ const constructIAC = async () => {
     let SPVContract = await new web3.eth.Contract(JSON.parse(compiledSPV.interface))
         .deploy({ data: linkedCode })
         .send({ from: manager, gas: gas, gasPrice: gasPrice});
+    console.log(3)
 
     // Link
     linkedCode = await linker.linkBytecode(compiledIAC.bytecode,
@@ -62,10 +64,13 @@ const constructIAC = async () => {
          'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
          'BytesLib.sol:BytesLib': bytesContract.options.address});
 
+    console.log(compiledIAC)
+
     // New Integral Auction contract instance
     return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
         .deploy({ data: linkedCode, arguments: [manager] })
         .send({ from: manager, gas: gas, gasPrice: gasPrice});
+
 };
 
 describe('IntegralAuction', () => {
@@ -81,7 +86,6 @@ describe('IntegralAuction', () => {
 
         iac = await constructIAC();
         assert.ok(iac.options.address);
-
         await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
             .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
             .then(res => {
@@ -99,7 +103,7 @@ describe('IntegralAuction', () => {
 
     describe('#allocate', async () => {
         it('returns allocated values', async () => {
-            let res = await iac.methods.allocate(aucId).call();
+            let res = await iac.methods.allocate(ETHER).call();
             assert.equal(res[0], 10 ** 18 / 400);
             assert.equal(res[1], 10 ** 18 - res[0]);
         });

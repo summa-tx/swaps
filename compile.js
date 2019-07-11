@@ -50,8 +50,8 @@ if (output.errors) {
     for (var o in output.errors) {
         var error = output.errors[o]
         if (error.indexOf('Dummy') === -1 || error.indexOf('Warning') === -1) {
-            console.log(error);
-            console.log(''); // blank line
+          console.log(error);
+          console.log(''); // blank line
         }
     }
     // console.log(output.errors);

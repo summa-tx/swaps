@@ -6,17 +6,7 @@ import {SafeMath} from "./SafeMath.sol";
 import {BringYourOwnWhitelist} from "./BringYourOwnWhitelist.sol";
 import {ValidateSPV} from "./ValidateSPV.sol";
 
-
-contract IntegralAuction is BringYourOwnWhitelist {
-
-    using BTCUtils for bytes;
-    using BTCUtils for uint256;
-    using BytesLib for bytes;
-    using SafeMath for uint256;
-    using ValidateSPV for bytes;
-    using ValidateSPV for bytes32;
-
-    enum AuctionStates { NONE, ACTIVE, CLOSED }
+interface IAuction {
 
     event AuctionActive(
         bytes32 indexed _auctionId,
@@ -36,6 +26,50 @@ contract IntegralAuction is BringYourOwnWhitelist {
         uint256 _value,
         uint256 _BTCValue
     );
+
+    function open(
+        bytes _partialTx,
+        uint256 _reservePrice,
+        uint256 _reqDiff,
+        address _asset,
+        uint256 _value
+    ) external payable returns (bytes32);
+
+    function claim(
+        bytes _tx,
+        bytes _proof,
+        uint _index,
+        bytes _headers
+    ) external returns (bool);
+
+    function checkTx(
+        bytes _tx
+    ) external pure returns (bytes32 _txid, address _bidder, uint64 _value);
+
+    function checkHeaders(
+        bytes _headers,
+        uint256 _reqDiff
+    ) external pure returns (uint256 _diff, bytes32 _merkleRoot);
+
+    function checkProof(
+        bytes32 _txid,
+        bytes32 _merkleRoot,
+        bytes _proof,
+        uint256 _index
+    ) external pure returns (bool);
+}
+
+
+contract IntegralAuction is IAuction, BringYourOwnWhitelist {
+
+    using BTCUtils for bytes;
+    using BTCUtils for uint256;
+    using BytesLib for bytes;
+    using SafeMath for uint256;
+    using ValidateSPV for bytes;
+    using ValidateSPV for bytes32;
+
+    enum AuctionStates { NONE, ACTIVE, CLOSED }
 
     struct Auction {
         AuctionStates state;
@@ -58,7 +92,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
     }
 
     function ensureFunding(address _asset, uint256 _value) internal;
-    function distribute(bytes32 _auctionId) internal;
+    function distribute(Auction storage _auction) internal;
 
     /// @notice                 Seller opens auction by committing ethereum
     /// @param _partialTx       Seller's partial transaction
@@ -71,7 +105,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         uint256 _reqDiff,
         address _asset,
         uint256 _value
-    ) public payable returns (bytes32) {
+    ) external payable returns (bytes32) {
 
         ensureFunding(_asset, _value);
 
@@ -104,6 +138,13 @@ contract IntegralAuction is BringYourOwnWhitelist {
         return _auctionId;
     }
 
+    function _findByTx(bytes _tx) internal view returns (bytes32 _auctionId, Auction storage _auction) {
+        _auctionId = keccak256(_tx.slice(7, 36));
+        // Require auction state to be ACTIVE
+        _auction = auctions[_auctionId];
+        require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
+    }
+
     /// @notice             Validate selected bid, bidder claims eth
     /// @param _tx          The raw byte tx
     /// @param _proof       The merkle proof of inclusion
@@ -115,22 +156,19 @@ contract IntegralAuction is BringYourOwnWhitelist {
         bytes _proof,
         uint _index,
         bytes _headers
-    ) public returns (bool) {
-        bytes32 _auctionId = keccak256(_tx.slice(7, 36));
-        Auction storage _auction = auctions[_auctionId];
-
+    ) external returns (bool) {
         bytes32 _txid;
         address _bidder;
         uint64 _value;
         bytes32 _merkleRoot;
         uint256 _diff;
+        Auction storage _auction;
+        bytes32 _auctionId;
+        (_auctionId, _auction) = _findByTx(_tx);
 
-        // Require auction state to be ACTIVE
-        require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
-
-        (_txid, _bidder, _value) = checkTx(_tx);
-        (_diff, _merkleRoot) = checkHeaders(_headers, _auction.reqDiff);
-        checkProof(_txid, _merkleRoot, _proof, _index);
+        (_txid, _bidder, _value) = _checkTx(_tx);
+        (_diff, _merkleRoot) = _checkHeaders(_headers, _auction.reqDiff);
+        _checkProof(_txid, _merkleRoot, _proof, _index);
 
         // Get bidder eth address from OP_RETURN payload bytes
         require(checkWhitelist(_auction.seller, _bidder), 'Bidder is not whitelisted.');
@@ -140,7 +178,7 @@ contract IntegralAuction is BringYourOwnWhitelist {
         _auction.state = AuctionStates.CLOSED;
         _auction.BTCvalue = _value;
 
-        distribute(_auctionId);
+        distribute(_auction);
 
         // Decrement Open positions
         openPositions[_auction.seller] = openPositions[_auction.seller].sub(1);
@@ -162,9 +200,9 @@ contract IntegralAuction is BringYourOwnWhitelist {
     /// @dev                Uses bitcoin parsing tools. This could be made more gas efficient
     /// @param _tx          The raw byte tx
     /// @return             The txid, the bidder's ethereum address, and the value of the first output
-    function checkTx(
+    function _checkTx(
         bytes _tx
-    ) public pure returns (bytes32 _txid, address _bidder, uint64 _value) {
+    ) internal pure returns (bytes32 _txid, address _bidder, uint64 _value) {
         bytes memory _nIns;
         bytes memory _ins;
         bytes memory _nOuts;
@@ -184,10 +222,10 @@ contract IntegralAuction is BringYourOwnWhitelist {
     /// @param _headers     The raw byte header chain
     /// @param _reqDiff     The required total difficulty for the header chain
     /// @return             The total difficulty of the header chain, and the first header's tx tree root
-    function checkHeaders(
+    function _checkHeaders(
         bytes _headers,
         uint256 _reqDiff
-    ) public pure returns (uint256 _diff, bytes32 _merkleRoot) {
+    ) internal pure returns (uint256 _diff, bytes32 _merkleRoot) {
         // Require summation of submitted block headers difficulty >= reqDiff
         _diff = _headers.validateHeaderChain();
         _merkleRoot = _headers.extractMerkleRootLE().toBytes32();
@@ -204,26 +242,47 @@ contract IntegralAuction is BringYourOwnWhitelist {
     /// @param _proof       The inclusion proof
     /// @param _index       The index of the txid in the leaf set
     /// @return             true if _proof and _index show that _txid is in the _merkleRoot, else false
-    function checkProof(
+    function _checkProof(
         bytes32 _txid,
         bytes32 _merkleRoot,
         bytes _proof,
         uint256 _index
-    ) public pure returns (bool) {
+    ) internal pure returns (bool) {
         require(_txid.prove(_merkleRoot, _proof, _index), 'Bad inclusion proof');
         return true;
     }
 
     /// @notice             Calculates the manager's fee
     /// @dev                Looks up the auction and calculates a 25bps fee. Do not use for erc721.
-    /// @param _auctionId   The 32 byte keccak256 of the auction outpoint
+    /// @param _value       The amount of value to split between bidder and manager
     /// @return             The fee share and the bidder's share
-    function allocate(bytes32 _auctionId) public view returns (uint256, uint256) {
-        Auction storage auction = auctions[_auctionId];
-        // Fee share
-        uint256 _feeShare = auction.value.div(400);
+    function _allocate(uint256 _value) internal pure returns (uint256, uint256) {
+        // manager share
+        uint256 _feeShare = _value.div(400);
         // Bidder share
-        uint256 _bidderShare = auction.value.sub(_feeShare);
+        uint256 _bidderShare = _value.sub(_feeShare);
         return (_feeShare, _bidderShare);
+    }
+
+    function checkTx(
+        bytes _tx
+    ) external pure returns (bytes32 _txid, address _bidder, uint64 _value) {
+        return _checkTx(_tx);
+    }
+
+    function checkHeaders(
+        bytes _headers,
+        uint256 _reqDiff
+    ) external pure returns (uint256 _diff, bytes32 _merkleRoot) {
+        return _checkHeaders(_headers, _reqDiff);
+    }
+
+    function checkProof(
+        bytes32 _txid,
+        bytes32 _merkleRoot,
+        bytes _proof,
+        uint256 _index
+    ) external pure returns (bool) {
+        return _checkProof(_txid, _merkleRoot, _proof, _index);
     }
 }

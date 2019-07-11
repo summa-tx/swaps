@@ -2,7 +2,7 @@ import sys
 import json
 import asyncio
 
-from scripts import interface_wrapper as iw
+# from scripts import interface_wrapper as iw
 
 from connectrum.svr_info import ServerInfo
 from connectrum.client import StratumClient
@@ -10,7 +10,7 @@ from connectrum.client import StratumClient
 from riemann import tx
 from riemann import utils as rutils
 
-from ether.transactions import UnsignedEthTx
+# from ether.transactions import UnsignedEthTx
 
 from typing import cast, Tuple, Union
 
@@ -37,15 +37,15 @@ async def setup_client():
 
     server = ServerInfo({
         "nickname": None,
-        "hostname": "electrum.anduck.net",
-        "ip_addr": "62.210.6.26",
+        "hostname": "fortress.qtornado.com",
+        "ip_addr": None,
         "ports": [
             "s50002",
             "t50001"
         ],
-        "version": "1.2",
+        "version": "1.4",
         "pruning_limit": 0,
-        "seen_at": 1533670768.86758
+        "seen_at": 1533670768.8676858
     })
 
     client = StratumClient()
@@ -57,13 +57,13 @@ async def setup_client():
             use_tor=False,
             disable_cert_verify=True),
         timeout=5)
-
-    await asyncio.wait_for(
-        client.RPC(
-            'server.version',
-            'bitcoin-spv-merkle',
-            '1.2'),
-        timeout=5)
+    #
+    # await asyncio.wait_for(
+    #     client.RPC(
+    #         'server.version',
+    #         'bitcoin-spv-merkle',
+    #         '1.2'),
+    #     timeout=5)
 
     return client
 
@@ -86,24 +86,24 @@ async def broadcast(t: Union[tx.Tx, str]):
     return res
 
 
-def make_ether_txn(
-        t: tx.Tx,
-        proof: str,
-        index: int,
-        headers: str,
-        contract_address: str,
-        nonce: int) -> UnsignedEthTx:
-
-    return iw.create_claim_tx(
-        tx=t.to_bytes(),
-        proof=bytes.fromhex(proof),
-        index=index,
-        headers=bytes.fromhex(headers),
-        nonce=nonce,
-        contract_address=contract_address,
-        gas_price=15 * 1000000000,  # 15 GWEI
-        start_gas=1000000,
-        value=0)
+# def make_ether_txn(
+#         t: tx.Tx,
+#         proof: str,
+#         index: int,
+#         headers: str,
+#         contract_address: str,
+#         nonce: int) -> UnsignedEthTx:
+#
+#     return iw.create_claim_tx(
+#         tx=t.to_bytes(),
+#         proof=bytes.fromhex(proof),
+#         index=index,
+#         headers=bytes.fromhex(headers),
+#         nonce=nonce,
+#         contract_address=contract_address,
+#         gas_price=15 * 1000000000,  # 15 GWEI
+#         start_gas=1000000,
+#         value=0)
 
 
 async def get_latest_blockheight() -> int:
@@ -113,7 +113,8 @@ async def get_latest_blockheight() -> int:
     client = await _get_client()
     fut, _ = client.subscribe('blockchain.headers.subscribe')
     block_dict = await fut
-    return block_dict['block_height']
+    print(block_dict)
+    return block_dict['height']
 
 
 async def get_block_merkle_root(height: int) -> bytes:
@@ -208,33 +209,34 @@ def verify_proof(proof: bytes, index: int):
             )
             # Halve and ceil the index
             index = index // 2 + 1
+        print(current.hex())
     # At the end we should have made the root
     if current != root:
         return False
     return True
 
-
-async def get_that_tx(
-        tx_id: str,
-        num_headers: int,
-        contract_address: str,
-        nonce: int):
-    '''
-    Makes an ethereum transaction containing a full SPV proof for a tx
-    '''
-    (tx_json, t) = await get_tx_from_api(tx_id)
-
-    proof, index = await get_merkle_proof_from_api(
-        t.tx_id.hex(), tx_json['block_height'])
-
-    # Create a header chain
-    chain = await get_header_chain(
-        tx_json['block_height'],
-        num_headers + 1)
-
-    txn = make_ether_txn(t, proof, index, chain, contract_address, nonce)
-
-    return txn
+#
+# async def get_that_tx(
+#         tx_id: str,
+#         num_headers: int,
+#         contract_address: str,
+#         nonce: int):
+#     '''
+#     Makes an ethereum transaction containing a full SPV proof for a tx
+#     '''
+#     (tx_json, t) = await get_tx_from_api(tx_id)
+#
+#     proof, index = await get_merkle_proof_from_api(
+#         t.tx_id.hex(), tx_json['block_height'])
+#
+#     # Create a header chain
+#     chain = await get_header_chain(
+#         tx_json['block_height'],
+#         num_headers + 1)
+#
+#     txn = make_ether_txn(t, proof, index, chain, contract_address, nonce)
+#
+#     return txn
 
 
 async def do_it_all(tx_id: str, num_headers: int):

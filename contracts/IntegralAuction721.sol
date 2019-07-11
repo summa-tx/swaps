@@ -18,10 +18,10 @@ contract IntegralAuction721 is IntegralAuction {
 
     /// @notice             Transfers the NFT to the bidder
     /// @dev                Calls transferFrom on the erc721 contract
-    /// @param _auctionId   The auction from which to distribute proceeds
-    function distribute(bytes32 _auctionId) internal {
+    /// @param _auction     A pointer to the auction
+    function distribute(Auction storage _auction) internal {
         // Transfer tokens to bidder
-        IERC721(auctions[_auctionId].asset).transferFrom(
-            address(this), auctions[_auctionId].bidder, auctions[_auctionId].value);
+        IERC721(_auction.asset).transferFrom(
+            address(this), _auction.bidder, _auction.value);
     }
 }

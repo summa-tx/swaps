@@ -19,17 +19,17 @@ contract IntegralAuctionEth is IntegralAuction {
 
     /// @notice             Transfers ETH to the bidder and manager
     /// @dev                Calls allocate to calculate shares
-    /// @param _auctionId   The auction from which to distribute proceeds
-    function distribute(bytes32 _auctionId) internal {
+    /// @param _auction     A pointer to the auction
+    function distribute(Auction storage _auction) internal {
         // Calculate fee and bidder shares
         uint256 _feeShare;
         uint256 _bidderShare;
-        (_feeShare, _bidderShare) = allocate(_auctionId);
+        (_feeShare, _bidderShare) = _allocate(_auction.value);
 
         // Transfer fee
         address(manager).transfer(_feeShare);
 
         // Transfer eth to selected bidder
-        address(auctions[_auctionId].bidder).transfer(_bidderShare);
+        address(_auction.bidder).transfer(_bidderShare);
     }
 }

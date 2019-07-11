@@ -23,24 +23,24 @@ contract IntegralAuction20 is IntegralAuction {
 
     /// @notice             Transfers tokens to the bidder and manager
     /// @dev                Calls allocate to calculate shares
-    /// @param _auctionId   The auction from which to distribute proceeds
-    function distribute(bytes32 _auctionId) internal {
+    /// @param _auction     A pointer to the auction
+    function distribute(Auction storage _auction) internal {
         // Calculate fee and bidder shares
         uint256 _feeShare;
         uint256 _bidderShare;
-        (_feeShare, _bidderShare) = allocate(_auctionId);
+        (_feeShare, _bidderShare) = _allocate(_auction.value);
 
         // send manager fee
         require(
-            IERC20(auctions[_auctionId].asset).transfer(
+            IERC20(_auction.asset).transfer(
                 manager, _feeShare),
             'Manager transfer failed.'
         );
 
         // send bidder proceeds
         require(
-            IERC20(auctions[_auctionId].asset).transfer(
-                auctions[_auctionId].bidder, _bidderShare),
+            IERC20(_auction.asset).transfer(
+                _auction.bidder, _bidderShare),
             'Bidder transfer failed.'
         );
     }
