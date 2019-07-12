@@ -1,24 +1,21 @@
 {
-  "name": "auction",
-  "version": "0.0.0",
-  "description": "ETH <=> BTC Order Matching",
+  "name": "stateless-swap",
+  "version": "1.0.0",
+  "description": "ETH <=> BTC trades",
   "scripts": {
-    "compile": "node compile.js",
     "test": "truffle test",
     "lint": "solium -d contracts/ && eslint ./test"
   },
-  "author": "",
+  "author": "James Prestwich",
   "license": "NONE",
   "dependencies": {
-    "bignumber.js": "^7.2.1",
     "bn.js": "^5.0.0",
-    "create-hash": "^1.2.0",
-    "eth-gas-reporter": "^0.2.4",
     "solc": "^0.4.26",
     "truffle": "^5.0.27",
     "web3": "^1.0.0-beta.55"
   },
   "devDependencies": {
+    "eth-gas-reporter": "^0.2.4",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.2.0",
     "eslint-plugin-import": "^2.18.0",

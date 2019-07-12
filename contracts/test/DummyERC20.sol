@@ -5,13 +5,17 @@ import {IERC20} from "../interfaces/IERC20.sol";
 contract DummyERC20 is IERC20 {
     uint8 errorTimer;
 
+    mapping (address => uint256) public balances;
+
     constructor() public {
         errorTimer = 0;
     }
 
     function totalSupply() external view returns (uint256) {return 0;}
 
-    function balanceOf(address who) external view returns (uint256) {who; return 0;}
+    function balanceOf(address who) external view returns (uint256) {
+        return balances[who];
+    }
 
     function allowance(address owner, address spender)
       external view returns (uint256) {spender; return uint256(owner);}
@@ -24,7 +28,8 @@ contract DummyERC20 is IERC20 {
         address to,
         uint256 value
     ) external returns (bool) {
-        from; to; value;
+        from;
+        balances[to] = value;
         return _do();
     }
 
@@ -32,7 +37,7 @@ contract DummyERC20 is IERC20 {
         address to,
         uint256 value
     ) external returns (bool) {
-        to; value;
+        balances[to] = value;
         return _do();
     }
 

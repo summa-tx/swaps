@@ -76,6 +76,9 @@ contract('IntegralAuction20', (accounts) => {
   });
 
   describe('#claim', async () => {
+    const managerShare = new BN(ETHER.divn(400));
+    const bidderShare = new BN(ETHER.sub(managerShare));
+
     before(async () => {
       await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, { from: seller });
     });
@@ -112,6 +115,28 @@ contract('IntegralAuction20', (accounts) => {
         assert.include(e.message, 'Bidder transfer failed.');
       }
       await erc20.clearError();
+    });
+
+    it('succeeds, and transfers shares to manager and bidder', async () => {
+      await iac.addWhitelistEntries([constants.GOOD.BIDDER], { from: seller });
+      await iac.claim(
+        constants.GOOD.OP_RETURN_TX,
+        constants.GOOD.PROOF,
+        constants.GOOD.PROOF_INDEX,
+        constants.GOOD.HEADER_CHAIN,
+        { from: seller }
+      );
+    });
+
+    it('transfers fee to manager', async () => {
+      const managerBalance = new BN(await erc20.balanceOf.call(manager), 10);
+      assert(managerBalance.eq(managerShare));
+    });
+
+    it('transfers bidder share to bidder', async () => {
+      const bidderBalance = new BN(await erc20.balanceOf.call(constants.GOOD.BIDDER), 10);
+      console.log(bidderBalance, bidderShare);
+      assert(bidderBalance.eq(bidderShare));
     });
   });
 });
