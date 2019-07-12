@@ -135,7 +135,6 @@ contract('IntegralAuction20', (accounts) => {
 
     it('transfers bidder share to bidder', async () => {
       const bidderBalance = new BN(await erc20.balanceOf.call(constants.GOOD.BIDDER), 10);
-      console.log(bidderBalance, bidderShare);
       assert(bidderBalance.eq(bidderShare));
     });
   });
