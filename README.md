@@ -1,8 +1,14 @@
 ### Building and running contracts
 ```
 npm i
-npm run compile
-npm test
+truffle compile
+truffle test
+```
+
+### Linting
+
+```
+npm run lint
 ```
 
 ### Python Setup
@@ -14,7 +20,7 @@ pyenv install 3.6.6
 pipenv install
 ```
 
-Then interact with the scripts via interpreter
+Then interact with the scripts via interpreter or shell
 
 ```
 pipenv run python
