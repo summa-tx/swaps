@@ -4,42 +4,34 @@ const ganache = require('ganache-cli');
 const Web3 = require('web3');
 const web3 = new Web3(ganache.provider());
 
+
+// eslint-disable-next-line camelcase
+async function deploySystem(deploy_list) {
+  const deployed = {}; // name: contract object
+  const linkable = {}; // name: linkable address
+
+  // eslint-disable-next-line camelcase,guard-for-in
+  for (const i in deploy_list) {
+    let args = deploy_list[i].args;
+    if (!args) {
+      args = [];
+    }
+    await deploy_list[i].contract.link(linkable);
+    const contract = await deploy_list[i].contract.new( ...args );
+    linkable[deploy_list[i].name] = contract.address;
+    deployed[deploy_list[i].name] = contract;
+  }
+  return deployed;
+}
+
 module.exports = {
+    deploySystem: deploySystem,
+
     latestTime: latestTime = async () => {
         let blockNumber = await web3.eth.getBlock('latest');
         return blockNumber.timestamp;
     },
-
-    increaseTime: increaseTime = async (duration) => {
-      const id = Date.now();
-
-      return new Promise((resolve, reject) => {
-        web3.currentProvider.sendAsync({
-          jsonrpc: '2.0',
-          method: 'evm_increaseTime',
-          params: [duration],
-          id: id,
-        }, err1 => {
-          if (err1) return reject(err1);
-
-          web3.currentProvider.sendAsync({
-            jsonrpc: '2.0',
-            method: 'evm_mine',
-            id: id + 1,
-          }, (err2, res) => {
-            return err2 ? reject(err2) : resolve(res);
-          });
-        });
-      });
-    },
-
-    increaseTimeTo: increaseTimeTo = async (target) => {
-      let now = await latestTime();
-      if (target < now) throw Error(`Cannot increase current time(${now}) to a moment in the past(${target})`);
-      let diff = target - now;
-      return increaseTime(diff);
-    },
-
+ 
     getPreimageAndHash: function* getPreimageAndHash() {
         var buff = Buffer(32)
             for (var j=31; j>=0; j--) {

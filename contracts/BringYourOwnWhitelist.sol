@@ -13,7 +13,7 @@ contract BringYourOwnWhitelist {
     /// @dev                Updates the whitelists mapping
     /// @param _entries     The entries to approve
     /// @return             true if successfully updated, otherwise OOG error
-    function addWhitelistEntries(address[] _entries) public returns (bool) {
+    function addWhitelistEntries(address[] memory _entries) public returns (bool) {
         // set whitelistExists = true if false
         if (!whitelistExists[msg.sender]) {
             whitelistExists[msg.sender] = true;
@@ -36,7 +36,7 @@ contract BringYourOwnWhitelist {
     /// @dev                Updates the whitelists mapping
     /// @param _entries     The entries to block
     /// @return             true if successfully updated, otherwise OOG error
-    function removeWhitelistEntries(address[] _entries) public returns (bool) {
+    function removeWhitelistEntries(address[] memory _entries) public returns (bool) {
         // remove entries to the whitelists mapping
         require(openPositions[msg.sender] == 0, 'Must close all positions before removing entries.');
 

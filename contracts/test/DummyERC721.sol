@@ -1,12 +1,12 @@
 pragma solidity 0.4.25;
 
-import {IERC721} from "./IERC721.sol";
+import {IERC721} from "../interfaces/IERC721.sol";
 
 
 contract DummyERC721 is IERC721 {
     uint8 errorTimer;
 
-    constructor() {
+    constructor() public {
         errorTimer = 0;
     }
 
@@ -15,6 +15,7 @@ contract DummyERC721 is IERC721 {
         address to,
         uint256 value
     ) public {
+        from; to; value;
         _do();
     }
 
@@ -33,23 +34,23 @@ contract DummyERC721 is IERC721 {
         errorTimer -= 1;
     }
 
-    function balanceOf(address owner) public view returns (uint256 balance) {return 0;}
-    function ownerOf(uint256 tokenId) public view returns (address owner) {return address(0);}
+    function balanceOf(address owner) public view returns (uint256 balance) {owner; return 0;}
+    function ownerOf(uint256 tokenId) public view returns (address owner) {tokenId; return address(0);}
 
-    function approve(address to, uint256 tokenId) public {}
+    function approve(address to, uint256 tokenId) public {to; tokenId;}
     function getApproved(uint256 tokenId)
-      public view returns (address operator) {return address(0);}
+      public view returns (address operator) {tokenId; return address(0);}
 
-    function setApprovalForAll(address operator, bool _approved) public {}
+    function setApprovalForAll(address operator, bool _approved) public {operator; _approved;}
     function isApprovedForAll(address owner, address operator)
-      public view returns (bool) {return true;}
+      public view returns (bool) {owner; operator; return true;}
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) {}
+    function safeTransferFrom(address from, address to, uint256 tokenId) public {from; to; tokenId;}
 
     function safeTransferFrom(
       address from,
       address to,
       uint256 tokenId,
       bytes data
-    ) public {}
+    ) public {from; to; tokenId; data;}
 }

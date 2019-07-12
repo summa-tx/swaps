@@ -1,176 +1,99 @@
-const assert = require('assert');
-const ganache = require('ganache-cli');
-const Web3 = require('web3');
-const web3 = new Web3(ganache.provider());
-const compiledBTCUtils = require('../build/BTCUtils.json');
-const compiledBytes = require('../build/BytesLib.json');
-const compiledSPV = require('../build/ValidateSPV.json')
-const compiledIAC = require('../build/IntegralAuction20.json');
-const compiledERC20 = require('../build/DummyERC20.json');
-const linker = require('solc/linker');
+const BN = require('bn.js');
+
+const BytesLib = artifacts.require('BytesLib');
+const BTCUtils = artifacts.require('BTCUtils');
+const ValidateSPV = artifacts.require('ValidateSPV');
+const IntegralAuction20 = artifacts.require('IntegralAuction20');
+const DummyERC20 = artifacts.require('DummyERC20');
+
 const utils = require('./utils');
-const constants = require('./constants');
+const constants = require('./constants.js');
+
+contract('IntegralAuction20', accounts => {
+
+  const ETHER = new BN('1000000000000000000', 10);
+
+  let manager;
+  let seller;
+  let whitelistTestAccount;
+
+  let iac;
+  let erc20;
+  let erc20address;
+
+  before(async () => {
+    manager = accounts[0]
+    seller = accounts[1];
+    whitelistTestAccount = accounts[5];
+    deployed = await utils.deploySystem([
+      { name: 'BytesLib', contract: BytesLib },
+      { name: 'BTCUtils', contract: BTCUtils },
+      { name: 'ValidateSPV', contract: ValidateSPV },
+      { name: 'IntegralAuction20', contract: IntegralAuction20, args: [manager] },
+      { name: 'DummyERC20', contract: DummyERC20 }
+    ]);
+    iac = deployed.IntegralAuction20;
+    erc20 = deployed.DummyERC20
+    erc20address = erc20.address
+  });
 
 
-// Suppress web3 MaxListenersExceededWarning
-var listeners = process.listeners('warning');
-listeners.forEach(listener => process.removeListener('warning', listener));
+  describe('#open', async () => {
+    it('fails with 0 value', async () => {
+      try {
+        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, 0, {from: seller})
+        assert(false);
+      } catch(e) {
+        assert.include(e.message, '_value must be greater than 0');
+      }
+    });
 
-const ETHER = web3.utils.toWei('1', 'ether')
+    it('fails if transferFrom fails', async () => {
+      await erc20.setError(1);
+      try {
+        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, {from: seller})
+        assert(false);
+      } catch(e) {
+        assert.include(e.message, 'transferFrom failed');
+      }
+      await erc20.clearError();
+    });
 
-let accounts;
-let manager;
-let seller;
-let whitelistTestAccount;
+    it('does not burn ether', async () => {
+      try {
+        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, {from: seller, value: ETHER})
+        assert(false);
+      } catch(e) {
+        assert.include(e.message, 'Do not burn ether here please');
+      }
+    });
+  });
 
-let gas = 5000000;
-let gasPrice = 100000000000;
-
-/* Calls IntegralAuction contract constructor and returns instance. */
-const constructIAC = async () => {
-
-    let linkedLibs;
-    accounts = await web3.eth.getAccounts();
-    manager = accounts[0];
-
-    let bytesContract = await new web3.eth.Contract(JSON.parse(compiledBytes.interface))
-        .deploy({ data: compiledBytes.bytecode})
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-
-    // Link
-    linkedCode = await linker.linkBytecode(compiledBTCUtils.bytecode,
-        {'BytesLib.sol:BytesLib': bytesContract.options.address});
-
-    let btcUtilsContract = await new web3.eth.Contract(JSON.parse(compiledBTCUtils.interface))
-        .deploy({ data: linkedCode })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-
-    // Link
-    linkedCode = await linker.linkBytecode(compiledSPV.bytecode,
-        {'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
-         'BytesLib.sol:BytesLib': bytesContract.options.address});
-
-    // New SPVStore
-    let SPVContract = await new web3.eth.Contract(JSON.parse(compiledSPV.interface))
-        .deploy({ data: linkedCode })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-
-    // Link
-    linkedCode = await linker.linkBytecode(compiledIAC.bytecode,
-        {'ValidateSPV.sol:ValidateSPV': SPVContract.options.address,
-         'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
-         'BytesLib.sol:BytesLib': bytesContract.options.address});
-
-    // New Integral Auction contract instance
-    return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
-        .deploy({ data: linkedCode, arguments: [manager] })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-};
-
-const constructERC20 = async () => {
-    return await new web3.eth.Contract(JSON.parse(compiledERC20.interface))
-        .deploy({ data: compiledERC20.bytecode})
-        .send({ from: manager, gas: gas, gasPrice: gasPrice });
-}
-
-describe('IntegralAuction20', () => {
-    let iac;
-    let erc20;
-    let addAucRes;
-    let erc20address;
-
+  describe('#claim', async () => {
     before(async () => {
-        accounts = await web3.eth.getAccounts();
-        manager = accounts[0];
-        seller = accounts[1];
-
-        iac = await constructIAC();
-        assert.ok(iac.options.address);
-
-        erc20 = await constructERC20();
-        assert.ok(erc20.options.address);
-        erc20address = erc20.options.address;
-
-        await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER)
-            .send({from: seller, gas: gas, gasPrice: gasPrice})
-            .then(res => {
-                addAucRes = res;
-                aucId = res.events.AuctionActive.returnValues[0];
-            });
+      await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, {from: seller})
     });
 
-    describe('#open', async () => {
-
-        it('fails with 0 value', async () => {
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, 0)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('_value must be greater than 0') >= 1
-                    );
-                });
-        });
-
-        it('fails if transferFrom fails', async () => {
-            await erc20.methods.setError(1)
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('transferFrom failed') >= 1
-                    );
-                });
-            await erc20.methods.clearError()
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-        });
-
-        it('does not burn ether', async () => {
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER)
-                .send({from: seller, value: ETHER, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Do not burn ether here please') >= 1
-                    );
-                });
-        });
+    it('fails if manager transfer fails', async () => {
+        await erc20.setError(1);
+      try {
+        await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller})
+        assert(false);
+      } catch(e) {
+        assert.include(e.message, 'Manager transfer failed.');
+      }
+      await erc20.clearError();
     });
 
-    describe('#claim', async () => {
-        it('fails if manager transfer fails', async () => {
-            await erc20.methods.setError(1)
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-
-            claimRes = await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Manager transfer failed.') >= 1
-                    );
-                });
-
-            await erc20.methods.clearError()
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-        });
-        it('fails if bidder transfer fails', async () => {
-            await erc20.methods.setError(2)
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-
-            claimRes = await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Bidder transfer failed.') >= 1
-                    );
-                });
-
-            await erc20.methods.clearError()
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-        });
+    it('fails if bidder transfer fails', async () => {
+      await erc20.setError(2);
+      try {
+        await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller})
+        assert(false);
+      } catch(e) {
+        assert.include(e.message, 'Bidder transfer failed.');
+      }
+      await erc20.clearError();
     });
+  });
 });

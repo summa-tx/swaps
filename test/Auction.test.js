@@ -1,305 +1,219 @@
-const assert = require('assert');
-const ganache = require('ganache-cli');
-const Web3 = require('web3');
-const web3 = new Web3(ganache.provider());
-const compiledBTCUtils = require('../build/BTCUtils.json');
-const compiledBytes = require('../build/BytesLib.json');
-const compiledSPV = require('../build/ValidateSPV.json')
-const compiledIAC = require('../build/DummyAuction.json');
-const linker = require('solc/linker');
+const BN = require('bn.js');
+
+const BytesLib = artifacts.require('BytesLib');
+const BTCUtils = artifacts.require('BTCUtils');
+const ValidateSPV = artifacts.require('ValidateSPV');
+const DummyAuction = artifacts.require('DummyAuction');
+
 const utils = require('./utils');
-const constants = require('./constants');
+const constants = require('./constants.js');
 
 
-// Suppress web3 MaxListenersExceededWarning
-var listeners = process.listeners('warning');
-listeners.forEach(listener => process.removeListener('warning', listener));
+contract('IntegralAuction', (accounts) => {
+  const ETHER = new BN('1000000000000000000', 10);
+
+  let deployed;
+  let iac;
+  let manager;
+  let seller;
+  let whitelistTestAccount;
+  let aucId;
+
+  before(async () => {
+    manager = accounts[0]
+    seller = accounts[1];
+    whitelistTestAccount = accounts[5];
+    deployed = await utils.deploySystem([
+      { name: 'BytesLib', contract: BytesLib },
+      { name: 'BTCUtils', contract: BTCUtils },
+      { name: 'ValidateSPV', contract: ValidateSPV },
+      { name: 'DummyAuction', contract: DummyAuction, args: [manager] }
+    ]);
+    iac = deployed.DummyAuction;
+  });
+
+  describe('#constructor', async () => {
+      it('sets the manager address', async () => {
+          assert.equal(await iac.manager.call(), manager);
+      });
+  });
 
 
-const ETHER = web3.utils.toWei('1', 'ether')
+  describe('#allocate', async () => {
+      it('returns allocated values', async () => {
+          let res = await iac.allocate.call(ETHER);
+          assert(res[0].eq(ETHER.divn(400)));
+          assert(res[1].eq(ETHER.sub(res[0])));
+      });
+  });
 
-let accounts;
-let manager;
-let seller;
-let whitelistTestAccount;
+  describe('#addWhitelistEntries', async () => {
+    let addRes;
 
-let gas = 5000000;
-let gasPrice = 100000000000;
+    it('updates whitelistExists on creation', async () => {
+      let res = await iac.whitelistExists.call(whitelistTestAccount);
+      assert(res === false);
+      addRes = await iac.addWhitelistEntries([whitelistTestAccount], {from: whitelistTestAccount});
+      res = await iac.whitelistExists.call(whitelistTestAccount);
+      assert.ok(res);
+    });
 
+    it('adds entries to the whitelist and emits an added event', async () => {
+      const blockNumber = await web3.eth.getBlock('latest').number
 
-/* Calls IntegralAuction contract constructor and returns instance. */
-const constructIAC = async () => {
+      await iac.addWhitelistEntries([constants.GOOD.BIDDER, seller, whitelistTestAccount], {from: whitelistTestAccount});
 
-    let linkedLibs;
-    accounts = await web3.eth.getAccounts();
-    manager = accounts[0];
+      let res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
+      assert.ok(res);
 
-    let bytesContract = await new web3.eth.Contract(JSON.parse(compiledBytes.interface))
-        .deploy({ data: compiledBytes.bytecode})
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
+      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
+      assert.ok(res);
 
-    // Link
-    linkedCode = await linker.linkBytecode(compiledBTCUtils.bytecode,
-        {'BytesLib.sol:BytesLib': bytesContract.options.address});
+      res = await iac.checkWhitelist.call(whitelistTestAccount, whitelistTestAccount);
+      assert.ok(res);
 
-    let btcUtilsContract = await new web3.eth.Contract(JSON.parse(compiledBTCUtils.interface))
-        .deploy({ data: linkedCode })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-      console.log(2)
+      const eventList = await iac.getPastEvents('AddedWhitelistEntries', { fromBlock: blockNumber, toBlock: 'latest' });
+      assert.equal(eventList[0].returnValues._sender, whitelistTestAccount);
+    });
+  });
 
-    // Link
-    linkedCode = await linker.linkBytecode(compiledSPV.bytecode,
-        {'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
-         'BytesLib.sol:BytesLib': bytesContract.options.address});
+  describe('#removeWhitelistEntires', async () => {
+    it('removes entries from the whitelist and emits events', async () => {
+      const blockNumber = await web3.eth.getBlock('latest').number
 
-    // New SPVStore
-    let SPVContract = await new web3.eth.Contract(JSON.parse(compiledSPV.interface))
-        .deploy({ data: linkedCode })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
-    console.log(3)
+      // Add entries and check they exist
+      await iac.addWhitelistEntries([constants.GOOD.BIDDER, seller], {from: whitelistTestAccount});
+      let res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
+      assert.ok(res);
+      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
+      assert.ok(res);
 
-    // Link
-    linkedCode = await linker.linkBytecode(compiledIAC.bytecode,
-        {'ValidateSPV.sol:ValidateSPV': SPVContract.options.address,
-         'BTCUtils.sol:BTCUtils': btcUtilsContract.options.address,
-         'BytesLib.sol:BytesLib': bytesContract.options.address});
+      // Now remove them
+      await iac.removeWhitelistEntries([constants.GOOD.BIDDER, seller], {from: whitelistTestAccount});
+      res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
+      assert(res === false);
+      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
+      assert(res === false);
 
-    console.log(compiledIAC)
+      const eventList = await iac.getPastEvents('RemovedWhitelistEntries', { fromBlock: blockNumber, toBlock: 'latest' });
+      assert.equal(eventList[0].returnValues._sender, whitelistTestAccount);
+    });
+  });
 
-    // New Integral Auction contract instance
-    return await new web3.eth.Contract(JSON.parse(compiledIAC.interface))
-        .deploy({ data: linkedCode, arguments: [manager] })
-        .send({ from: manager, gas: gas, gasPrice: gasPrice});
+  describe('#checkWhitelist', async () => {
+      // This function is pretty thoroughly checked in removeWhitelistEntries
+      it('returns true if a whitelist has not been created', async () => {
+          let res = await iac.checkWhitelist.call(accounts[7], accounts[8]);
+          assert.ok(res);
+      });
+  });
 
-};
-
-describe('IntegralAuction', () => {
-    let iac;
-    let aucId;
-    let addAucRes;
-
+  describe('#open', async () => {
     before(async () => {
-        accounts = await web3.eth.getAccounts();
-        manager = accounts[0];
-        seller = accounts[1];
-        whitelistTestAccount = accounts[5];
+      const blockNumber = await web3.eth.getBlock('latest').number
 
-        iac = await constructIAC();
-        assert.ok(iac.options.address);
-        await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
-            .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
-            .then(res => {
-                addAucRes = res;
-                aucId = res.events.AuctionActive.returnValues[0];
-            });
+      await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER, {from: seller, value: 10 ** 18})
+
+      const eventList = await iac.getPastEvents('AuctionActive', { fromBlock: blockNumber, toBlock: 'latest' });
+      aucId = eventList[0].returnValues._auctionId;
     });
 
-    describe('#constructor', async () => {
-        it('sets the manager address', async () => {
-            assert.equal(await iac.methods.manager().call(), manager);
-        });
+    it('returns the txid on success', async () => {
+      assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
     });
 
-
-    describe('#allocate', async () => {
-        it('returns allocated values', async () => {
-            let res = await iac.methods.allocate(ETHER).call();
-            assert.equal(res[0], 10 ** 18 / 400);
-            assert.equal(res[1], 10 ** 18 - res[0]);
-        });
+    it('adds a new auction to the auctions mapping', async () => {
+      let res = await iac.auctions.call(aucId);
+      assert.equal(res[0], 1);  // state
+      assert.equal(res[1], 10 ** 18);  // ethValue
     });
 
-    describe('#addWhitelistEntries', async () => {
-
-        let addRes;
-
-        it('updates whitelistExists on creation', async () => {
-            let res = await iac.methods.whitelistExists(whitelistTestAccount).call();
-            assert(res === false);
-            addRes = await iac.methods.addWhitelistEntries([whitelistTestAccount])
-                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            res = await iac.methods.whitelistExists(whitelistTestAccount).call();
-            assert.ok(res);
-        });
-
-        it('adds entries to the whitelist', async () => {
-            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER, seller, whitelistTestAccount])
-                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            let res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
-            assert.ok(res);
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
-            assert.ok(res);
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, whitelistTestAccount).call();
-            assert.ok(res);
-        });
-
-        it('emits an added event', async () => {
-            assert.ok(addRes.events.AddedWhitelistEntries);
-        });
+    it('increments open positions', async () => {
+      let res = await iac.openPositions.call(seller);
+      assert.equal(res, 1);
     });
 
-    describe('#removeWhitelistEntires', async () => {
-
-        let removeRes;
-
-        it('removes entries from the whitelist', async () => {
-            // Add entries and check they exist
-            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER, seller])
-                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            let res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
-            assert.ok(res);
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
-            assert.ok(res);
-
-            // Now remove them
-            removeRes = await iac.methods.removeWhitelistEntries([constants.GOOD.BIDDER, seller])
-                .send({from: whitelistTestAccount, gas: gas, gasPrice: gasPrice});
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, constants.GOOD.BIDDER).call();
-            assert(res === false);
-            res = await iac.methods.checkWhitelist(whitelistTestAccount, seller).call();
-            assert(res === false);
-        });
-
-        it('emits a removed event', async () => {
-            assert.ok(removeRes.events.RemovedWhitelistEntries);
-        });
+    it('errors if auction already exists', async () => {
+      try {
+        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER, {from: seller, value: 10 ** 18})
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'Auction exists.');
+      }
     });
+  });
 
-    describe('#checkWhitelist', async () => {
-        // This function is pretty thoroughly checked in removeWhitelistEntries
-        it('returns true if a whitelist has not been created', async () => {
-            let res = await iac.methods.checkWhitelist(accounts[7], accounts[8]).call();
-            assert.ok(res);
-        });
-    });
+  describe('#claim', async () => {
+      let claimRes;
+      let bidderStartBalance;
 
-    describe('#open', async () => {
+      before(async () => {
+          managerStartBalance = parseInt(await web3.eth.getBalance(manager));
+          bidderStartBalance = parseInt(await web3.eth.getBalance(constants.GOOD.BIDDER));
+      });
 
-        it('returns the txid on success', async () =>
-        {
-            assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
-        });
+      it('errors if a whitelist exists and the bidder is not whitelisted', async () => {
+          await iac.addWhitelistEntries([seller], {from: seller});
+          try {
+            await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller});
+            assert(false);
+          } catch (e) {
+            assert.include(e.message, 'Bidder is not whitelisted.');
+          }
+      });
 
-        it('adds a new auction to the auctions mapping', async () => {
-            let res = await iac.methods.auctions(aucId).call();
-            assert.equal(res[0], 1);  // state
-            assert.equal(res[1], 10 ** 18);  // ethValue
-        });
+      it('returns on success and emits AuctionClosed', async () => {
+        const blockNumber = await web3.eth.getBlock('latest').number;
 
-        it('emits an AuctionActive event', async () => {
-            assert.ok(addAucRes.events.AuctionActive);
-        });
+        await iac.addWhitelistEntries([constants.GOOD.BIDDER], {from: seller});
+        await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller});
 
-        it('increments open positions', async () => {
-            let res = await iac.methods.openPositions(seller).call();
-            assert.equal(res, 1);
-        });
+        const eventList = await iac.getPastEvents('AuctionClosed', { fromBlock: blockNumber, toBlock: 'latest' });
+        assert.equal(eventList[0].returnValues._auctionId, aucId);
+      });
 
-        it('errors if auction already exists', async () => {
-            await iac.methods.open(constants.GOOD.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
-                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Auction exists.') >= 1
-                    );
-                });
-        });
-    });
+      it('updates auction state to CLOSED', async () => {
+          let res = await iac.auctions.call(aucId);
+          assert.equal(res[0], 2);
+      });
 
-    describe('#claim', async () => {
-        let claimRes;
-        let bidderStartBalance;
+      it('errors if auction state is not ACTIVE', async () => {
+        try {
+          await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller});
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Auction has closed or does not exist.');
+        }
+      });
 
-        before(async () => {
-            managerStartBalance = parseInt(await web3.eth.getBalance(manager));
-            bidderStartBalance = parseInt(await web3.eth.getBalance(constants.GOOD.BIDDER));
-        });
+      it('errors if total difficulty sum is too low', async () => {
+        await iac.open(constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER, {from: seller, value: 10 ** 18});
+        try {
+          await iac.claim(constants.WORK_TOO_LOW.OP_RETURN_TX, constants.WORK_TOO_LOW.PROOF, constants.WORK_TOO_LOW.PROOF_INDEX, constants.WORK_TOO_LOW.HEADER_CHAIN, {from: seller});
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Not enough difficulty in header chain.');
+        }
+      });
 
-        it('errors if a whitelist exists and the bidder is not whitelisted', async () => {
-            await iac.methods.addWhitelistEntries([seller])
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
+      it('errors if nOutputs is less than two', async () => {
+        await iac.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER, {from: seller, value: 10 ** 18});
+        try {
+          await iac.claim(constants.FEW_OUTPUTS.OP_RETURN_TX, constants.FEW_OUTPUTS.PROOF, constants.FEW_OUTPUTS.PROOF_INDEX, constants.FEW_OUTPUTS.HEADER_CHAIN, {from: seller})
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Must have at least 2 TxOuts');
+        }
+      });
 
-            await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Bidder is not whitelisted.') >= 1
-                    );
-                });
-        });
-
-        it('returns on success', async () => {
-            await iac.methods.addWhitelistEntries([constants.GOOD.BIDDER])
-                .send({from: seller, gas: gas, gasPrice: gasPrice});
-
-            claimRes = await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-            assert.ok(claimRes);
-        });
-
-        it('updates auction state to CLOSED', async () => {
-            let res = await iac.methods.auctions(aucId).call();
-            assert.equal(res[0], 2);
-        });
-
-        it('emits AuctionClosed event', async () => {
-            assert.ok(claimRes.events.AuctionClosed);
-        });
-
-        it('errors if auction state is not ACTIVE', async () => {
-            await iac.methods.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => assert(false))
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Auction has closed or does not exist.') >= 1
-                    );
-                });
-        });
-
-        it('errors if total difficulty sum is too low', async () => {
-            await iac.methods.open(constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100, constants.ADDR0, ETHER)
-                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
-
-            await iac.methods.claim(constants.WORK_TOO_LOW.OP_RETURN_TX, constants.WORK_TOO_LOW.PROOF, constants.WORK_TOO_LOW.PROOF_INDEX, constants.WORK_TOO_LOW.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => {assert(false)})
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Not enough difficulty in header chain.') >= 1
-                    );
-                });
-        });
-
-        it('errors if nOutputs is less than two', async () => {
-            await iac.methods.open(constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER)
-                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
-
-            await iac.methods.claim(constants.FEW_OUTPUTS.OP_RETURN_TX, constants.FEW_OUTPUTS.PROOF, constants.FEW_OUTPUTS.PROOF_INDEX, constants.FEW_OUTPUTS.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => {assert(false)})
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Must have at least 2 TxOuts') >= 1
-                    );
-                });
-        });
-        it('errors if second output is not OP_RETURN', async () => {
-            await iac.methods.open(constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER)
-                .send({from: seller, value: 10 ** 18, gas: gas, gasPrice: gasPrice});
-
-            await iac.methods.claim(constants.OP_RETURN_WRONG.OP_RETURN_TX, constants.OP_RETURN_WRONG.PROOF, constants.OP_RETURN_WRONG.PROOF_INDEX, constants.OP_RETURN_WRONG.HEADER_CHAIN)
-                .send({from: seller, gas: gas, gasPrice: gasPrice})
-                .then(() => {
-                    assert(false)
-                })
-                .catch(e => {
-                    assert(
-                        e.message.indexOf('Not an OP_RETURN output') >= 1
-                    );
-                });
-        });
-    });
+      it('errors if second output is not OP_RETURN', async () => {
+        await iac.open(constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0, constants.ADDR0, ETHER, {from: seller, value: 10 ** 18});
+        try {
+          await iac.claim(constants.OP_RETURN_WRONG.OP_RETURN_TX, constants.OP_RETURN_WRONG.PROOF, constants.OP_RETURN_WRONG.PROOF_INDEX, constants.OP_RETURN_WRONG.HEADER_CHAIN, {from: seller})
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Not an OP_RETURN output');
+        }
+      });
+  });
 });

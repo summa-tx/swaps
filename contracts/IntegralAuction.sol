@@ -1,10 +1,10 @@
 pragma solidity 0.4.25;
 
-import {BytesLib} from "./BytesLib.sol";
-import {BTCUtils} from "./BTCUtils.sol";
-import {SafeMath} from "./SafeMath.sol";
+import {BytesLib} from "./bitcoin-spv/BytesLib.sol";
+import {BTCUtils} from "./bitcoin-spv/BTCUtils.sol";
+import {SafeMath} from "./bitcoin-spv/SafeMath.sol";
+import {ValidateSPV} from "./bitcoin-spv/ValidateSPV.sol";
 import {BringYourOwnWhitelist} from "./BringYourOwnWhitelist.sol";
-import {ValidateSPV} from "./ValidateSPV.sol";
 
 interface IAuction {
 
@@ -138,13 +138,6 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         return _auctionId;
     }
 
-    function _findByTx(bytes _tx) internal view returns (bytes32 _auctionId, Auction storage _auction) {
-        _auctionId = keccak256(_tx.slice(7, 36));
-        // Require auction state to be ACTIVE
-        _auction = auctions[_auctionId];
-        require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
-    }
-
     /// @notice             Validate selected bid, bidder claims eth
     /// @param _tx          The raw byte tx
     /// @param _proof       The merkle proof of inclusion
@@ -157,21 +150,19 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         uint _index,
         bytes _headers
     ) external returns (bool) {
-        bytes32 _txid;
         address _bidder;
         uint64 _value;
-        bytes32 _merkleRoot;
-        uint256 _diff;
-        Auction storage _auction;
-        bytes32 _auctionId;
-        (_auctionId, _auction) = _findByTx(_tx);
 
-        (_txid, _bidder, _value) = _checkTx(_tx);
-        (_diff, _merkleRoot) = _checkHeaders(_headers, _auction.reqDiff);
-        _checkProof(_txid, _merkleRoot, _proof, _index);
+        bytes32 _auctionId = keccak256(_tx.slice(7, 36));
+        Auction storage _auction = auctions[_auctionId];
+
+        (_bidder, _value) = _makeAllChecks(_tx, _proof, _index, _headers, _auction.reqDiff);
 
         // Get bidder eth address from OP_RETURN payload bytes
         require(checkWhitelist(_auction.seller, _bidder), 'Bidder is not whitelisted.');
+
+        // Require auction state to be ACTIVE
+        require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
 
         // Update auction state
         _auction.bidder = _bidder;
@@ -194,6 +185,21 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         );
 
         return true;
+    }
+
+    function _makeAllChecks(
+        bytes _tx,
+        bytes _proof,
+        uint _index,
+        bytes _headers,
+        uint256 _reqDiff
+    ) internal pure returns (address _bidder , uint64 _value) {
+        bytes32 _txid;
+        bytes32 _merkleRoot;
+        uint256 _diff;
+        (_txid, _bidder, _value) = _checkTx(_tx);
+        (_diff, _merkleRoot) = _checkHeaders(_headers, _reqDiff);
+        _checkProof(_txid, _merkleRoot, _proof, _index);
     }
 
     /// @notice             Validates the submitted bid transaction
