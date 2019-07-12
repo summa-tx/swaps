@@ -38,7 +38,7 @@ contract BringYourOwnWhitelist {
     /// @return             true if successfully updated, otherwise OOG error
     function removeWhitelistEntries(address[] memory _entries) public returns (bool) {
         // remove entries to the whitelists mapping
-        require(openPositions[msg.sender] == 0, 'Must close all positions before removing entries.');
+        require(openPositions[msg.sender] == 0, "Must close all positions before removing entries.");
 
         // removes entries from the whitelists mapping
         for (uint i = 0; i < _entries.length; i++) {

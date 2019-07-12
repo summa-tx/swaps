@@ -7,6 +7,7 @@ import {IntegralAuction} from "./IntegralAuction.sol";
 
 contract IntegralAuctionEth is IntegralAuction {
 
+    /* solium-disable-next-line */
     constructor (address _manager) public IntegralAuction(_manager) {}
 
     /// @notice             Ensures that ether is paid in
@@ -39,6 +40,7 @@ contract IntegralAuctionEth is IntegralAuction {
 
 contract IntegralAuction20 is IntegralAuction {
 
+    /* solium-disable-next-line */
     constructor (address _manager) public IntegralAuction(_manager) {}
 
     /// @notice             Ensures that the tokens are transferred
@@ -46,11 +48,11 @@ contract IntegralAuction20 is IntegralAuction {
     /// @param _asset       The address of the erc20 token contract
     /// @param _value       The number of tokens to transfer
     function ensureFunding(address _asset, uint256 _value) internal {
-        require(msg.value == 0, 'Do not burn ether here please');
-        require(_value > 0, '_value must be greater than 0');
+        require(msg.value == 0, "Do not burn ether here please");
+        require(_value > 0, "_value must be greater than 0");
         require(
             IERC20(_asset).transferFrom(msg.sender, address(this), _value),
-            'transferFrom failed'
+            "transferFrom failed"
         );
     }
 
@@ -68,14 +70,14 @@ contract IntegralAuction20 is IntegralAuction {
         require(
             IERC20(_auction.asset).transfer(
                 manager, _feeShare),
-            'Manager transfer failed.'
+            "Manager transfer failed."
         );
 
         // send bidder proceeds
         require(
             IERC20(_auction.asset).transfer(
                 _auction.bidder, _bidderShare),
-            'Bidder transfer failed.'
+            "Bidder transfer failed."
         );
     }
 }
@@ -83,6 +85,7 @@ contract IntegralAuction20 is IntegralAuction {
 
 contract IntegralAuction721 is IntegralAuction {
 
+    /* solium-disable-next-line */
     constructor (address _manager) public IntegralAuction(_manager) {}
 
     /// @notice             Ensures that the NFT is transferred
@@ -90,7 +93,7 @@ contract IntegralAuction721 is IntegralAuction {
     /// @param _asset       The address of the erc721 token contract
     /// @param _value       The ID number of the token to transfer
     function ensureFunding(address _asset, uint256 _value) internal {
-        require(msg.value == 0, 'Do not burn ether here please');
+        require(msg.value == 0, "Do not burn ether here please");
         IERC721(_asset).transferFrom(msg.sender, address(this), _value);
     }
 

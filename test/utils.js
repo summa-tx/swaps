@@ -1,72 +1,28 @@
-const assert = require('assert');
-const createHash = require('create-hash')
-const ganache = require('ganache-cli');
-const Web3 = require('web3');
-const web3 = new Web3(ganache.provider());
-
-
 // eslint-disable-next-line camelcase
-async function deploySystem(deploy_list) {
+async function deploySystem(deployList) {
   const deployed = {}; // name: contract object
   const linkable = {}; // name: linkable address
 
-  // eslint-disable-next-line camelcase,guard-for-in
-  for (const i in deploy_list) {
-    let args = deploy_list[i].args;
+  for (let i = 0; i < deployList.length; i += 1) {
+    let { args } = deployList[i];
     if (!args) {
       args = [];
     }
-    await deploy_list[i].contract.link(linkable);
-    const contract = await deploy_list[i].contract.new( ...args );
-    linkable[deploy_list[i].name] = contract.address;
-    deployed[deploy_list[i].name] = contract;
+
+    // eslint-disable-next-line no-await-in-loop
+    await deployList[i].contract.link(linkable);
+
+    // eslint-disable-next-line no-await-in-loop
+    const contract = await deployList[i].contract.new(...args);
+    linkable[deployList[i].name] = contract.address;
+    deployed[deployList[i].name] = contract;
   }
   return deployed;
 }
 
 module.exports = {
-    deploySystem: deploySystem,
-
-    latestTime: latestTime = async () => {
-        let blockNumber = await web3.eth.getBlock('latest');
-        return blockNumber.timestamp;
-    },
- 
-    getPreimageAndHash: function* getPreimageAndHash() {
-        var buff = Buffer(32)
-            for (var j=31; j>=0; j--) {
-                for (var i=1; i<256; i++) {
-                    hexString = buff.toString('hex')
-                        digest = this.sha256(hexString)
-                            hexString = '0x' + hexString
-                                buff[j] = i
-                                    yield [hexString, digest]
-                }
-            }
-    },
-
-    hash160: function hash160 (hexString) {
-        let buffer = Buffer.from(hexString, 'hex')
-            var t = createHash('sha256').update(buffer).digest()
-                var u = createHash('rmd160').update(t).digest()
-                    return '0x' + u.toString('hex')
-    },
-
-    sha256: function sha256 (hexString) {
-        let buffer = Buffer.from(hexString, 'hex')
-            var t = createHash('sha256').update(buffer).digest()
-                return '0x' + t.toString('hex')
-    },
-
-    duration: {
-        seconds: function(val) { return val},
-        minutes: function(val) { return val * this.seconds(60) },
-        hours:   function(val) { return val * this.minutes(60) },
-        days:    function(val) { return val * this.hours(24) },
-        weeks:   function(val) { return val * this.days(7) },
-        years:   function(val) { return val * this.days(365)}
-    }
-}
+  deploySystem
+};
 
 
 // The MIT License (MIT)

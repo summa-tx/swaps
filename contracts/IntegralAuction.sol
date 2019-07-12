@@ -159,10 +159,10 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         (_bidder, _value) = _makeAllChecks(_tx, _proof, _index, _headers, _auction.reqDiff);
 
         // Get bidder eth address from OP_RETURN payload bytes
-        require(checkWhitelist(_auction.seller, _bidder), 'Bidder is not whitelisted.');
+        require(checkWhitelist(_auction.seller, _bidder), "Bidder is not whitelisted.");
 
         // Require auction state to be ACTIVE
-        require(_auction.state == AuctionStates.ACTIVE, 'Auction has closed or does not exist.');
+        require(_auction.state == AuctionStates.ACTIVE, "Auction has closed or does not exist.");
 
         // Update auction state
         _auction.bidder = _bidder;
@@ -216,8 +216,8 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         bytes memory _locktime;
 
         (_nIns, _ins, _nOuts, _outs, _locktime, _txid) = _tx.parseTransaction();
-        require(_txid != bytes32(0));
-        require(_nOuts.bytesToUint() >= 2, 'Must have at least 2 TxOuts');
+        require(_txid != bytes32(0), "tx parsing failed");
+        require(_nOuts.bytesToUint() >= 2, "Must have at least 2 TxOuts");
 
         _bidder = _tx.extractOutputAtIndex(1).extractOpReturnData().toAddress(0);
         _value = _tx.extractOutputAtIndex(0).extractValue();
@@ -235,10 +235,10 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         // Require summation of submitted block headers difficulty >= reqDiff
         _diff = _headers.validateHeaderChain();
         _merkleRoot = _headers.extractMerkleRootLE().toBytes32();
-        require(_diff != 1, 'Header bytes not multiple of 80.');
-        require(_diff != 2, 'Header bytes not a valid chain.');
-        require(_diff != 3, 'Header does not meet difficulty target.');
-        require(_diff >= _reqDiff, 'Not enough difficulty in header chain.');
+        require(_diff != 1, "Header bytes not multiple of 80.");
+        require(_diff != 2, "Header bytes not a valid chain.");
+        require(_diff != 3, "Header does not meet difficulty target.");
+        require(_diff >= _reqDiff, "Not enough difficulty in header chain.");
     }
 
     /// @notice             Validates submitted merkle inclusion proof
@@ -254,7 +254,7 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
         bytes _proof,
         uint256 _index
     ) internal pure returns (bool) {
-        require(_txid.prove(_merkleRoot, _proof, _index), 'Bad inclusion proof');
+        require(_txid.prove(_merkleRoot, _proof, _index), "Bad inclusion proof");
         return true;
     }
 

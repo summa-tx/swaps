@@ -1,3 +1,4 @@
+/* global artifacts contract before describe it assert */
 const BN = require('bn.js');
 
 const BytesLib = artifacts.require('BytesLib');
@@ -9,12 +10,11 @@ const DummyERC721 = artifacts.require('DummyERC721');
 const utils = require('./utils');
 const constants = require('./constants.js');
 
-contract('IntegralAuction721', accounts => {
+contract('IntegralAuction721', (accounts) => {
   const ETHER = new BN('1000000000000000000', 10);
 
   let manager;
   let seller;
-  let whitelistTestAccount;
 
   let iac;
   let erc721;
@@ -41,27 +41,25 @@ contract('IntegralAuction721', accounts => {
   // });
 
   before(async () => {
-    manager = accounts[0]
-    seller = accounts[1];
-    whitelistTestAccount = accounts[5];
-    deployed = await utils.deploySystem([
+    [manager, seller] = accounts;
+
+    const deployed = await utils.deploySystem([
       { name: 'BytesLib', contract: BytesLib },
       { name: 'BTCUtils', contract: BTCUtils },
       { name: 'ValidateSPV', contract: ValidateSPV },
       { name: 'IntegralAuction721', contract: IntegralAuction721, args: [manager] },
-      { name: 'DummyERC721', contract: DummyERC721 }
+      { name: 'DummyERC721', contract: DummyERC721 },
     ]);
     iac = deployed.IntegralAuction721;
-    erc721 = deployed.DummyERC721
-    erc721address = erc721.address
+    erc721 = deployed.DummyERC721;
+    erc721address = erc721.address;
   });
 
   describe('#open', async () => {
-
     it('fails if transferFrom fails', async () => {
       await erc721.setError(1);
       try {
-        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc721address, ETHER, {from: seller});
+        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc721address, ETHER, { from: seller });
         assert(false);
       } catch (e) {
         assert.include(e.message, 'Dummy revert');
@@ -71,7 +69,14 @@ contract('IntegralAuction721', accounts => {
 
     it('does not burn ether', async () => {
       try {
-        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc721address, ETHER, {from: seller, value: ETHER});
+        await iac.open(
+          constants.GOOD.PARTIAL_TX,
+          17,
+          100,
+          erc721address,
+          ETHER,
+          { from: seller, value: ETHER }
+        );
         assert(false);
       } catch (e) {
         assert.include(e.message, 'Do not burn ether here please');
@@ -81,14 +86,20 @@ contract('IntegralAuction721', accounts => {
 
   describe('#claim', async () => {
     before(async () => {
-      await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc721address, ETHER, {from: seller});
+      await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc721address, ETHER, { from: seller });
     });
 
     it('fails if manager transfer fails', async () => {
       await erc721.setError(1);
 
       try {
-        claimRes = await iac.claim(constants.GOOD.OP_RETURN_TX, constants.GOOD.PROOF, constants.GOOD.PROOF_INDEX, constants.GOOD.HEADER_CHAIN, {from: seller});
+        await iac.claim(
+          constants.GOOD.OP_RETURN_TX,
+          constants.GOOD.PROOF,
+          constants.GOOD.PROOF_INDEX,
+          constants.GOOD.HEADER_CHAIN,
+          { from: seller }
+        );
         assert(false);
       } catch (e) {
         assert.include(e.message, 'Dummy revert');

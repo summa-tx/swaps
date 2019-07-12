@@ -1,0 +1,12 @@
+node_modules
+contracts/Migrations.sol
+contracts/test/DummyERC20.sol
+contracts/test/DummyERC721.sol
+contracts/test/DummyAuction.sol
+contracts/interfaces/IERC721.sol
+contracts/bitcoin-spv/ValidateSPV.sol
+contracts/bitcoin-spv/SigCheck.sol
+contracts/bitcoin-spv/SafeMath.sol
+contracts/bitcoin-spv/SPVStore.sol
+contracts/bitcoin-spv/BytesLib.sol
+contracts/bitcoin-spv/BTCUtils.sol
