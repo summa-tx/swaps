@@ -82,7 +82,6 @@ contract IntegralAuction20 is IntegralAuction {
     }
 }
 
-
 contract IntegralAuction721 is IntegralAuction {
 
     /* solium-disable-next-line */

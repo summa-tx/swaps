@@ -98,6 +98,8 @@ contract IntegralAuction is IAuction, BringYourOwnWhitelist {
     /// @param _partialTx       Seller's partial transaction
     /// @param _reservePrice    Minimum acceptable bid (sats)
     /// @param _reqDiff         Minimum acceptable block difficulty summation
+    /// @param _asset           The address of the asset contract. address(0) for ETH
+    /// @param _value           The amount of asset for sale, in smallest possible units
     /// @return                 true if Seller post is valid, false otherwise
     function open(
         bytes _partialTx,

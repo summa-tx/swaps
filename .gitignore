@@ -4,3 +4,9 @@ scripts/nft_auction_setup.py
 scripts/eth_auction_constants.py
 __pycache__/
 .mypy_cache/
+
+# coverage
+scTopics
+coverage/
+coverageEnv/
+coverage.json
