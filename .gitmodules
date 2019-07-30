@@ -1,4 +1,0 @@
-[submodule "bitcoin-spv"]
-	path = contracts/bitcoin-spv
-    url = git@github.com:summa-tx/bitcoin-spv.git
-    branch = master

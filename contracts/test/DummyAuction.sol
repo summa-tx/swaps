@@ -1,10 +1,10 @@
-pragma solidity 0.4.25;
+pragma solidity ^0.5.10;
 
 import {IntegralAuction} from "../IntegralAuction.sol";
 
 contract DummyAuction is IntegralAuction {
 
-    constructor (address _manager) public IntegralAuction(_manager) {}
+    constructor (address _developer) public IntegralAuction(_developer) {}
 
     function ensureFunding(address _asset, uint256 _value) internal {
         _asset; _value;
@@ -12,9 +12,5 @@ contract DummyAuction is IntegralAuction {
 
     function distribute(Auction storage _auction) internal {
         _auction;
-    }
-
-    function allocate(uint256 _value) external pure returns (uint256, uint256) {
-        return _allocate(_value);
     }
 }

@@ -1,44 +1,173 @@
 /* global artifacts contract before describe it assert web3 */
 
-
 const BN = require('bn.js');
-
-const BytesLib = artifacts.require('BytesLib');
-const BTCUtils = artifacts.require('BTCUtils');
-const ValidateSPV = artifacts.require('ValidateSPV');
-const DummyAuction = artifacts.require('DummyAuction');
-
-const utils = require('./utils');
 const constants = require('./constants.js');
 
+const DummyAuction = artifacts.require('DummyAuction');
+
+
+const ETHER = new BN('1000000000000000000', 10);
+const DIFF = new BN('7019199231177', 10);
 
 contract('IntegralAuction', (accounts) => {
-  const ETHER = new BN('1000000000000000000', 10);
-
-  let deployed;
   let iac;
-  let manager;
+  let developer;
   let seller;
-  let whitelistTestAccount;
+
   let aucId;
 
   before(async () => {
-    [manager, seller,,, whitelistTestAccount] = accounts;
-    deployed = await utils.deploySystem([
-      { name: 'BytesLib', contract: BytesLib },
-      { name: 'BTCUtils', contract: BTCUtils },
-      { name: 'ValidateSPV', contract: ValidateSPV },
-      { name: 'DummyAuction', contract: DummyAuction, args: [manager] },
-    ]);
-    iac = deployed.DummyAuction;
+    [developer, seller] = accounts;
+    iac = await DummyAuction.new(developer);
   });
 
   describe('#constructor', async () => {
-    it('sets the manager address', async () => {
-      assert.equal(await iac.manager.call(), manager);
+    it('sets the developer address', async () => {
+      assert.equal(await iac.developer.call(), developer);
     });
   });
 
+  describe('stateful tests', async () => {
+    describe('#open', async () => {
+      it('opens a new listing and emits an event', async () => {
+        const blockNumber = await web3.eth.getBlock('latest').number;
+
+        await iac.open(
+          constants.GOOD.PARTIAL_TX,
+          DIFF.addn(1),
+          constants.ADDR0,
+          ETHER,
+          { from: seller, value: 10 ** 18 }
+        );
+
+        const eventList = await iac.getPastEvents(
+          'AuctionActive',
+          { fromBlock: blockNumber, toBlock: 'latest' }
+        );
+        /* eslint-disable no-underscore-dangle */
+        aucId = eventList[0].returnValues._auctionId;
+        assert.equal(eventList[0].returnValues._seller, seller);
+        /* eslint-enable no-underscore-dangle */
+      });
+
+      it('returns the txid on success', async () => {
+        assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
+      });
+
+      it('adds a new auction to the auctions mapping', async () => {
+        const res = await iac.auctions.call(aucId);
+        assert(res[0].eqn(1)); // state
+        assert(res[1].eq(ETHER)); // ethValue
+      });
+
+      it('errors if auction already exists', async () => {
+        try {
+          await iac.open(
+            constants.GOOD.PARTIAL_TX,
+            100,
+            constants.ADDR0,
+            ETHER,
+            { from: seller, value: 10 ** 18 }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Auction exists.');
+        }
+      });
+    });
+
+    describe('#claim', async () => {
+      it('errors if total difficulty sum is too low', async () => {
+        try {
+          await iac.claim(
+            constants.GOOD.PROOF,
+            constants.GOOD.PROOF_INDEX,
+            constants.GOOD.VERSION,
+            constants.GOOD.VIN,
+            constants.GOOD.VOUT,
+            constants.GOOD.LOCKTIME,
+            constants.GOOD.HEADER_CHAIN.substring(0, 162),
+            { from: seller }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Not enough difficulty in header chain.');
+        }
+      });
+
+      it('returns on success and emits AuctionClosed', async () => {
+        const blockNumber = await web3.eth.getBlock('latest').number;
+
+        await iac.claim(
+          constants.GOOD.PROOF,
+          constants.GOOD.PROOF_INDEX,
+          constants.GOOD.VERSION,
+          constants.GOOD.VIN,
+          constants.GOOD.VOUT,
+          constants.GOOD.LOCKTIME,
+          constants.GOOD.HEADER_CHAIN,
+          { from: seller }
+        );
+
+        const eventList = await iac.getPastEvents(
+          'AuctionClosed',
+          { fromBlock: blockNumber, toBlock: 'latest' }
+        );
+        /* eslint-disable-next-line no-underscore-dangle */
+        assert.equal(eventList[0].returnValues._auctionId, aucId);
+      });
+
+      it('updates auction state to CLOSED', async () => {
+        const res = await iac.auctions.call(aucId);
+        assert(res[0].eqn(2));
+      });
+
+      it('errors if auction state is not ACTIVE', async () => {
+        try {
+          await iac.claim(
+            constants.GOOD.PROOF,
+            constants.GOOD.PROOF_INDEX,
+            constants.GOOD.VERSION,
+            constants.GOOD.VIN,
+            constants.GOOD.VOUT,
+            constants.GOOD.LOCKTIME,
+            constants.GOOD.HEADER_CHAIN,
+            { from: seller }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Auction has closed or does not exist.');
+        }
+      });
+
+      it('defauls to the seller when bidder address parsing fails', async () => {
+        const blockNumber = await web3.eth.getBlock('latest').number;
+        await iac.open(
+          constants.FEW_OUTPUTS.PARTIAL_TX,
+          0,
+          constants.ADDR0,
+          ETHER,
+          { from: seller, value: 10 ** 18 }
+        );
+        await iac.claim(
+          constants.FEW_OUTPUTS.PROOF,
+          constants.FEW_OUTPUTS.PROOF_INDEX,
+          constants.FEW_OUTPUTS.VERSION,
+          constants.FEW_OUTPUTS.VIN,
+          constants.FEW_OUTPUTS.VOUT,
+          constants.FEW_OUTPUTS.LOCKTIME,
+          constants.FEW_OUTPUTS.HEADER_CHAIN,
+          { from: seller }
+        );
+        const eventList = await iac.getPastEvents(
+          'AuctionClosed',
+          { fromBlock: blockNumber, toBlock: 'latest' }
+        );
+        /* eslint-disable-next-line no-underscore-dangle */
+        assert.equal(eventList[0].returnValues._bidder, seller);
+      });
+    });
+  });
 
   describe('#allocate', async () => {
     it('returns allocated values', async () => {
@@ -48,240 +177,135 @@ contract('IntegralAuction', (accounts) => {
     });
   });
 
-  describe('#addWhitelistEntries', async () => {
-    it('updates whitelistExists on creation', async () => {
-      let res = await iac.whitelistExists.call(whitelistTestAccount);
-      assert(res === false);
-      await iac.addWhitelistEntries([whitelistTestAccount], { from: whitelistTestAccount });
-      res = await iac.whitelistExists.call(whitelistTestAccount);
-      assert.ok(res);
+  describe('#extractBidder', async () => {
+    it('extracts the bidder from the op_return in the 2nd output', async () => {
+      const res = await iac.extractBidder(constants.GOOD.VOUT);
+      assert.equal(res, constants.GOOD.BIDDER);
     });
 
-    it('adds entries to the whitelist and emits an added event', async () => {
-      const blockNumber = await web3.eth.getBlock('latest').number;
-
-      await iac.addWhitelistEntries(
-        [constants.GOOD.BIDDER, seller, whitelistTestAccount],
-        { from: whitelistTestAccount }
-      );
-
-      let res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
-      assert.ok(res);
-
-      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
-      assert.ok(res);
-
-      res = await iac.checkWhitelist.call(whitelistTestAccount, whitelistTestAccount);
-      assert.ok(res);
-
-      const eventList = await iac.getPastEvents(
-        'AddedWhitelistEntries',
-        { fromBlock: blockNumber, toBlock: 'latest' }
-      );
-      /* eslint-disable-next-line no-underscore-dangle */
-      assert.equal(eventList[0].returnValues._sender, whitelistTestAccount);
+    it('returns address(0) if there is only 1 output', async () => {
+      const res = await iac.extractBidder(constants.FEW_OUTPUTS.VOUT);
+      assert.equal(res, constants.ADDR0);
+    });
+    it('returns address(0) if the 2nd output is not an opreturn', async () => {
+      const res = await iac.extractBidder(constants.OP_RETURN_WRONG.VOUT);
+      assert.equal(res, constants.ADDR0);
     });
   });
 
-  describe('#removeWhitelistEntires', async () => {
-    it('removes entries from the whitelist and emits events', async () => {
-      const blockNumber = await web3.eth.getBlock('latest').number;
-
-      // Add entries and check they exist
-      await iac.addWhitelistEntries(
-        [constants.GOOD.BIDDER, seller],
-        { from: whitelistTestAccount }
-      );
-      let res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
-      assert.ok(res);
-      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
-      assert.ok(res);
-
-      // Now remove them
-      await iac.removeWhitelistEntries(
-        [constants.GOOD.BIDDER, seller],
-        { from: whitelistTestAccount }
-      );
-      res = await iac.checkWhitelist.call(whitelistTestAccount, constants.GOOD.BIDDER);
-      assert(res === false);
-      res = await iac.checkWhitelist.call(whitelistTestAccount, seller);
-      assert(res === false);
-
-      const eventList = await iac.getPastEvents(
-        'RemovedWhitelistEntries',
-        { fromBlock: blockNumber, toBlock: 'latest' }
-      );
-      /* eslint-disable-next-line no-underscore-dangle */
-      assert.equal(eventList[0].returnValues._sender, whitelistTestAccount);
-    });
-  });
-
-  describe('#checkWhitelist', async () => {
-    // This function is pretty thoroughly checked in removeWhitelistEntries
-    it('returns true if a whitelist has not been created', async () => {
-      const res = await iac.checkWhitelist.call(accounts[7], accounts[8]);
-      assert.ok(res);
-    });
-  });
-
-  describe('#open', async () => {
-    before(async () => {
-      const blockNumber = await web3.eth.getBlock('latest').number;
-
-      await iac.open(
-        constants.GOOD.PARTIAL_TX,
-        17,
-        100,
-        constants.ADDR0,
-        ETHER,
-        { from: seller, value: 10 ** 18 }
-      );
-
-      const eventList = await iac.getPastEvents('AuctionActive', { fromBlock: blockNumber, toBlock: 'latest' });
-      /* eslint-disable-next-line no-underscore-dangle */
-      aucId = eventList[0].returnValues._auctionId;
-    });
-
-    it('returns the txid on success', async () => {
-      assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
-    });
-
-    it('adds a new auction to the auctions mapping', async () => {
-      const res = await iac.auctions.call(aucId);
-      assert.equal(res[0], 1); // state
-      assert.equal(res[1], 10 ** 18); // ethValue
-    });
-
-    it('increments open positions', async () => {
-      const res = await iac.openPositions.call(seller);
-      assert.equal(res, 1);
-    });
-
-    it('errors if auction already exists', async () => {
-      try {
-        await iac.open(
-          constants.GOOD.PARTIAL_TX,
-          17,
-          100,
-          constants.ADDR0,
-          ETHER,
-          { from: seller, value: 10 ** 18 }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Auction exists.');
-      }
-    });
-  });
-
-  describe('#claim', async () => {
-    it('errors if a whitelist exists and the bidder is not whitelisted', async () => {
-      await iac.addWhitelistEntries([seller], { from: seller });
-      try {
-        await iac.claim(
-          constants.GOOD.OP_RETURN_TX,
-          constants.GOOD.PROOF,
-          constants.GOOD.PROOF_INDEX,
-          constants.GOOD.HEADER_CHAIN,
-          { from: seller }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Bidder is not whitelisted.');
-      }
-    });
-
-    it('returns on success and emits AuctionClosed', async () => {
-      const blockNumber = await web3.eth.getBlock('latest').number;
-
-      await iac.addWhitelistEntries([constants.GOOD.BIDDER], { from: seller });
-      await iac.claim(
-        constants.GOOD.OP_RETURN_TX,
+  describe('#makeAllChecks', async () => {
+    it('returns the difficutly', async () => {
+      const res = await iac.makeAllChecks(
         constants.GOOD.PROOF,
         constants.GOOD.PROOF_INDEX,
-        constants.GOOD.HEADER_CHAIN,
-        { from: seller }
+        constants.GOOD.VERSION,
+        constants.GOOD.VIN,
+        constants.GOOD.VOUT,
+        constants.GOOD.LOCKTIME,
+        constants.GOOD.HEADER_CHAIN
       );
-
-      const eventList = await iac.getPastEvents('AuctionClosed', { fromBlock: blockNumber, toBlock: 'latest' });
-      /* eslint-disable-next-line no-underscore-dangle */
-      assert.equal(eventList[0].returnValues._auctionId, aucId);
+      assert(res.eq(DIFF.muln(7)));
     });
+  });
 
-    it('updates auction state to CLOSED', async () => {
-      const res = await iac.auctions.call(aucId);
-      assert.equal(res[0], 2);
-    });
-
-    it('errors if auction state is not ACTIVE', async () => {
+  describe('#checkTx', async () => {
+    it('validates the vin', async () => {
       try {
-        await iac.claim(
-          constants.GOOD.OP_RETURN_TX,
+        await iac.checkTx(
+          constants.GOOD.VERSION,
+          '0xFF',
+          constants.GOOD.VOUT,
+          constants.GOOD.LOCKTIME
+        );
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'vin is malformed');
+      }
+    });
+
+    it('validates the vin', async () => {
+      try {
+        await iac.checkTx(
+          constants.GOOD.VERSION,
+          constants.GOOD.VIN,
+          '0xFF',
+          constants.GOOD.LOCKTIME
+        );
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'vout is malformed');
+      }
+    });
+
+    it('returns the txid', async () => {
+      const res = await iac.checkTx(
+        constants.GOOD.VERSION,
+        constants.GOOD.VIN,
+        constants.GOOD.VOUT,
+        constants.GOOD.LOCKTIME
+      );
+      assert.equal(res, constants.GOOD.TX_ID_LE);
+    });
+  });
+
+  describe('#checkHeaders', async () => {
+    it('errors if the header array length is not a multiple of 80', async () => {
+      try {
+        await iac.checkHeaders('0xFF');
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'Header bytes not multiple of 80.');
+      }
+    });
+    it('errors if the headers are not a valid chain', async () => {
+      try {
+        const badChain = `${constants.GOOD.HEADER_CHAIN.substring(0, 162)}${'00'.repeat(160)}`;
+        await iac.checkHeaders(badChain);
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'Header bytes not a valid chain.');
+      }
+    });
+    it('errors if the headers do not meet the difficulty target', async () => {
+      try {
+        // Change the last byte to make its work low
+        const badChain = `${constants.GOOD.HEADER_CHAIN.substring(0, 320)}${'ff'}`;
+        await iac.checkHeaders(badChain);
+        assert(false);
+      } catch (e) {
+        assert.include(e.message, 'Header does not meet its own difficulty target.');
+      }
+    });
+    it('returns diff and merkle root', async () => {
+      const res = await iac.checkHeaders(constants.GOOD.HEADER_CHAIN);
+      assert(res[0].eq(DIFF.muln(7)));
+      assert.equal(res[1], constants.GOOD.MERKLE_ROOT);
+    });
+  });
+
+  describe('#checkProof', async () => {
+    it('errors on a bad proof', async () => {
+      try {
+        await iac.checkProof(
+          constants.GOOD.TX_ID_LE,
+          constants.GOOD.MERKLE_ROOT,
           constants.GOOD.PROOF,
-          constants.GOOD.PROOF_INDEX,
-          constants.GOOD.HEADER_CHAIN, { from: seller }
+          3
         );
         assert(false);
       } catch (e) {
-        assert.include(e.message, 'Auction has closed or does not exist.');
+        assert.include(e.message, 'Bad inclusion proof');
       }
     });
 
-    it('errors if total difficulty sum is too low', async () => {
-      await iac.open(
-        constants.WORK_TOO_LOW.PARTIAL_TX, 17, 100,
-        constants.ADDR0, ETHER, { from: seller, value: 10 ** 18 }
+    it('validates proofs successfully', async () => {
+      const res = await iac.checkProof(
+        constants.GOOD.TX_ID_LE,
+        constants.GOOD.MERKLE_ROOT,
+        constants.GOOD.PROOF,
+        constants.GOOD.PROOF_INDEX
       );
-      try {
-        await iac.claim(
-          constants.WORK_TOO_LOW.OP_RETURN_TX,
-          constants.WORK_TOO_LOW.PROOF,
-          constants.WORK_TOO_LOW.PROOF_INDEX,
-          constants.WORK_TOO_LOW.HEADER_CHAIN,
-          { from: seller }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Not enough difficulty in header chain.');
-      }
-    });
-
-    it('errors if nOutputs is less than two', async () => {
-      await iac.open(
-        constants.FEW_OUTPUTS.PARTIAL_TX, 17, 0,
-        constants.ADDR0, ETHER, { from: seller, value: 10 ** 18 }
-      );
-      try {
-        await iac.claim(
-          constants.FEW_OUTPUTS.OP_RETURN_TX,
-          constants.FEW_OUTPUTS.PROOF,
-          constants.FEW_OUTPUTS.PROOF_INDEX,
-          constants.FEW_OUTPUTS.HEADER_CHAIN,
-          { from: seller }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Must have at least 2 TxOuts');
-      }
-    });
-
-    it('errors if second output is not OP_RETURN', async () => {
-      await iac.open(
-        constants.OP_RETURN_WRONG.PARTIAL_TX, 17, 0,
-        constants.ADDR0, ETHER, { from: seller, value: 10 ** 18 }
-      );
-      try {
-        await iac.claim(
-          constants.OP_RETURN_WRONG.OP_RETURN_TX,
-          constants.OP_RETURN_WRONG.PROOF,
-          constants.OP_RETURN_WRONG.PROOF_INDEX,
-          constants.OP_RETURN_WRONG.HEADER_CHAIN,
-          { from: seller }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Not an OP_RETURN output');
-      }
+      assert.isTrue(res);
     });
   });
 });

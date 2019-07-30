@@ -10,6 +10,7 @@
   "author": "James Prestwich",
   "license": "NONE",
   "dependencies": {
+    "bitcoin-spv": "git+https://github.com/summa-tx/bitcoin-spv.git#v2.0.0",
     "bn.js": "^5.0.0",
     "solc": "^0.4.26",
     "truffle": "^5.0.27",

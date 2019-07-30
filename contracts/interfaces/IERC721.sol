@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.10;
 
 /*The MIT License (MIT)
 
@@ -64,7 +64,7 @@ contract IERC721 {
     address from,
     address to,
     uint256 tokenId,
-    bytes data
+    bytes memory data
   )
     public;
 }

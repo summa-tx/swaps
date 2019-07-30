@@ -1,4 +1,4 @@
-pragma solidity 0.4.25;
+pragma solidity ^0.5.10;
 
 import {IERC20} from "./interfaces/IERC20.sol";
 
@@ -39,12 +39,12 @@ contract Nonfungiblizer {
 
     function withdrawEth(address _recipient) public  {
         require(msg.sender == owner, "only owner");
-        _recipient.transfer(address(this).balance);
+        address(uint160(_recipient)).transfer(address(this).balance);
     }
 
     function shutdown() public  {
         require(msg.sender == owner, "only owner");
-        selfdestruct(owner);
+        selfdestruct(address(uint160(owner)));
     }
 
     function transfer(address _newOwner) public  {

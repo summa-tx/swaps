@@ -1,141 +1,130 @@
 /* global artifacts contract before describe it assert */
 
 const BN = require('bn.js');
+const constants = require('./constants.js');
 
-const BytesLib = artifacts.require('BytesLib');
-const BTCUtils = artifacts.require('BTCUtils');
-const ValidateSPV = artifacts.require('ValidateSPV');
 const IntegralAuction20 = artifacts.require('IntegralAuction20');
 const DummyERC20 = artifacts.require('DummyERC20');
 
-const utils = require('./utils');
-const constants = require('./constants.js');
+const ETHER = new BN('1000000000000000000', 10);
+const DIFF = new BN('7019199231177', 10);
+const developerShare = new BN(ETHER.divn(400));
+const bidderShare = new BN(ETHER.sub(developerShare));
 
 contract('IntegralAuction20', (accounts) => {
-  const ETHER = new BN('1000000000000000000', 10);
-
-  let manager;
-  let seller;
+  const [developer, seller] = accounts;
 
   let iac;
   let erc20;
   let erc20address;
 
   before(async () => {
-    [manager, seller] = accounts;
-
-    const deployed = await utils.deploySystem([
-      { name: 'BytesLib', contract: BytesLib },
-      { name: 'BTCUtils', contract: BTCUtils },
-      { name: 'ValidateSPV', contract: ValidateSPV },
-      { name: 'IntegralAuction20', contract: IntegralAuction20, args: [manager] },
-      { name: 'DummyERC20', contract: DummyERC20 },
-    ]);
-    iac = deployed.IntegralAuction20;
-    erc20 = deployed.DummyERC20;
+    iac = await IntegralAuction20.new(developer);
+    erc20 = await DummyERC20.new();
     erc20address = erc20.address;
   });
 
 
-  describe('#open', async () => {
-    it('fails with 0 value', async () => {
-      try {
-        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, 0, { from: seller });
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, '_value must be greater than 0');
-      }
+  describe('stateful tests', async () => {
+    describe('#open', async () => {
+      it('fails with 0 value', async () => {
+        try {
+          await iac.open(constants.GOOD.PARTIAL_TX, DIFF, erc20address, 0, { from: seller });
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, '_value must be greater than 0');
+        }
+      });
+
+      it('fails if transferFrom fails', async () => {
+        await erc20.setError(1);
+        try {
+          await iac.open(constants.GOOD.PARTIAL_TX, DIFF, erc20address, ETHER, { from: seller });
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'transferFrom failed');
+        }
+        await erc20.clearError();
+      });
+
+      it('does not burn ether', async () => {
+        try {
+          await iac.open(
+            constants.GOOD.PARTIAL_TX,
+            DIFF,
+            erc20address,
+            ETHER,
+            { from: seller, value: ETHER }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Do not burn ether here please');
+        }
+      });
     });
 
-    it('fails if transferFrom fails', async () => {
-      await erc20.setError(1);
-      try {
-        await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, { from: seller });
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'transferFrom failed');
-      }
-      await erc20.clearError();
-    });
+    describe('#claim', async () => {
+      before(async () => {
+        await iac.open(constants.GOOD.PARTIAL_TX, DIFF, erc20address, ETHER, { from: seller });
+      });
 
-    it('does not burn ether', async () => {
-      try {
-        await iac.open(
-          constants.GOOD.PARTIAL_TX,
-          17,
-          100,
-          erc20address,
-          ETHER,
-          { from: seller, value: ETHER }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Do not burn ether here please');
-      }
-    });
-  });
+      it('fails if developer transfer fails', async () => {
+        await erc20.setError(1);
+        try {
+          await iac.claim(
+            constants.GOOD.PROOF,
+            constants.GOOD.PROOF_INDEX,
+            constants.GOOD.VERSION,
+            constants.GOOD.VIN,
+            constants.GOOD.VOUT,
+            constants.GOOD.LOCKTIME,
+            constants.GOOD.HEADER_CHAIN,
+            { from: seller }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Developer transfer failed.');
+        }
+        await erc20.clearError();
+      });
 
-  describe('#claim', async () => {
-    const managerShare = new BN(ETHER.divn(400));
-    const bidderShare = new BN(ETHER.sub(managerShare));
+      it('fails if bidder transfer fails', async () => {
+        await erc20.setError(2);
+        try {
+          await iac.claim(
+            constants.GOOD.PROOF,
+            constants.GOOD.PROOF_INDEX,
+            constants.GOOD.VERSION,
+            constants.GOOD.VIN,
+            constants.GOOD.VOUT,
+            constants.GOOD.LOCKTIME,
+            constants.GOOD.HEADER_CHAIN,
+            { from: seller }
+          );
+          assert(false);
+        } catch (e) {
+          assert.include(e.message, 'Bidder transfer failed.');
+        }
+        await erc20.clearError();
+      });
 
-    before(async () => {
-      await iac.open(constants.GOOD.PARTIAL_TX, 17, 100, erc20address, ETHER, { from: seller });
-    });
-
-    it('fails if manager transfer fails', async () => {
-      await erc20.setError(1);
-      try {
+      it('succeeds, and transfers shares to developer and bidder', async () => {
         await iac.claim(
-          constants.GOOD.OP_RETURN_TX,
           constants.GOOD.PROOF,
           constants.GOOD.PROOF_INDEX,
+          constants.GOOD.VERSION,
+          constants.GOOD.VIN,
+          constants.GOOD.VOUT,
+          constants.GOOD.LOCKTIME,
           constants.GOOD.HEADER_CHAIN,
           { from: seller }
         );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Manager transfer failed.');
-      }
-      await erc20.clearError();
-    });
+        const developerBalance = new BN(await erc20.balanceOf.call(developer), 10);
+        assert(developerBalance.eq(developerShare));
 
-    it('fails if bidder transfer fails', async () => {
-      await erc20.setError(2);
-      try {
-        await iac.claim(
-          constants.GOOD.OP_RETURN_TX,
-          constants.GOOD.PROOF,
-          constants.GOOD.PROOF_INDEX,
-          constants.GOOD.HEADER_CHAIN,
-          { from: seller }
-        );
-        assert(false);
-      } catch (e) {
-        assert.include(e.message, 'Bidder transfer failed.');
-      }
-      await erc20.clearError();
-    });
-
-    it('succeeds, and transfers shares to manager and bidder', async () => {
-      await iac.addWhitelistEntries([constants.GOOD.BIDDER], { from: seller });
-      await iac.claim(
-        constants.GOOD.OP_RETURN_TX,
-        constants.GOOD.PROOF,
-        constants.GOOD.PROOF_INDEX,
-        constants.GOOD.HEADER_CHAIN,
-        { from: seller }
-      );
-    });
-
-    it('transfers fee to manager', async () => {
-      const managerBalance = new BN(await erc20.balanceOf.call(manager), 10);
-      assert(managerBalance.eq(managerShare));
-    });
-
-    it('transfers bidder share to bidder', async () => {
-      const bidderBalance = new BN(await erc20.balanceOf.call(constants.GOOD.BIDDER), 10);
-      assert(bidderBalance.eq(bidderShare));
+        const bidderBalance = new BN(await erc20.balanceOf.call(constants.GOOD.BIDDER), 10);
+        assert(bidderBalance.eq(bidderShare));
+      });
     });
   });
 });

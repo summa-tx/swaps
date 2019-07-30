@@ -1,4 +1,4 @@
-pragma solidity 0.4.25;
+pragma solidity ^0.5.10;
 
 import {IERC721} from "../interfaces/IERC721.sol";
 
@@ -51,6 +51,6 @@ contract DummyERC721 is IERC721 {
       address from,
       address to,
       uint256 tokenId,
-      bytes data
+      bytes memory data
     ) public {from; to; tokenId; data;}
 }

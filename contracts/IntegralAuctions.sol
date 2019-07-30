@@ -1,4 +1,4 @@
-pragma solidity 0.4.25;
+pragma solidity ^0.5.10;
 
 import {IERC20} from "./interfaces/IERC20.sol";
 import {IERC721} from "./interfaces/IERC721.sol";
@@ -8,7 +8,7 @@ import {IntegralAuction} from "./IntegralAuction.sol";
 contract IntegralAuctionEth is IntegralAuction {
 
     /* solium-disable-next-line */
-    constructor (address _manager) public IntegralAuction(_manager) {}
+    constructor (address _developer) public IntegralAuction(_developer) {}
 
     /// @notice             Ensures that ether is paid in
     /// @dev                User must pass in address(0) and the amount of ether
@@ -21,7 +21,7 @@ contract IntegralAuctionEth is IntegralAuction {
         require(_value == msg.value, "value must equal msg.value");
     }
 
-    /// @notice             Transfers ETH to the bidder and manager
+    /// @notice             Transfers ETH to the bidder and developer
     /// @dev                Calls allocate to calculate shares
     /// @param _auction     A pointer to the auction
     function distribute(Auction storage _auction) internal {
@@ -31,17 +31,17 @@ contract IntegralAuctionEth is IntegralAuction {
         (_feeShare, _bidderShare) = _allocate(_auction.value);
 
         // Transfer fee
-        address(manager).transfer(_feeShare);
+        address(developer).transfer(_feeShare);
 
         // Transfer eth to selected bidder
-        address(_auction.bidder).transfer(_bidderShare);
+        address(uint160(_auction.bidder)).transfer(_bidderShare);
     }
 }
 
 contract IntegralAuction20 is IntegralAuction {
 
     /* solium-disable-next-line */
-    constructor (address _manager) public IntegralAuction(_manager) {}
+    constructor (address _developer) public IntegralAuction(_developer) {}
 
     /// @notice             Ensures that the tokens are transferred
     /// @dev                Calls transferFrom on the erc20 contract, and checks that no ether is being burnt
@@ -57,7 +57,7 @@ contract IntegralAuction20 is IntegralAuction {
     }
 
 
-    /// @notice             Transfers tokens to the bidder and manager
+    /// @notice             Transfers tokens to the bidder and developer
     /// @dev                Calls allocate to calculate shares
     /// @param _auction     A pointer to the auction
     function distribute(Auction storage _auction) internal {
@@ -66,11 +66,11 @@ contract IntegralAuction20 is IntegralAuction {
         uint256 _bidderShare;
         (_feeShare, _bidderShare) = _allocate(_auction.value);
 
-        // send manager fee
+        // send developer fee
         require(
             IERC20(_auction.asset).transfer(
-                manager, _feeShare),
-            "Manager transfer failed."
+                developer, _feeShare),
+            "Developer transfer failed."
         );
 
         // send bidder proceeds
@@ -85,7 +85,7 @@ contract IntegralAuction20 is IntegralAuction {
 contract IntegralAuction721 is IntegralAuction {
 
     /* solium-disable-next-line */
-    constructor (address _manager) public IntegralAuction(_manager) {}
+    constructor (address _developer) public IntegralAuction(_developer) {}
 
     /// @notice             Ensures that the NFT is transferred
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
