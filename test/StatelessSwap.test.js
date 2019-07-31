@@ -3,13 +3,13 @@
 const BN = require('bn.js');
 const constants = require('./constants.js');
 
-const DummyAuction = artifacts.require('DummyAuction');
+const DummySwap = artifacts.require('DummySwap');
 
 
 const ETHER = new BN('1000000000000000000', 10);
 const DIFF = new BN('7019199231177', 10);
 
-contract('IntegralAuction', (accounts) => {
+contract('StatelessSwap', (accounts) => {
   let iac;
   let developer;
   let seller;
@@ -18,7 +18,7 @@ contract('IntegralAuction', (accounts) => {
 
   before(async () => {
     [developer, seller] = accounts;
-    iac = await DummyAuction.new(developer);
+    iac = await DummySwap.new(developer);
   });
 
   describe('#constructor', async () => {
@@ -41,11 +41,11 @@ contract('IntegralAuction', (accounts) => {
         );
 
         const eventList = await iac.getPastEvents(
-          'AuctionActive',
+          'ListingActive',
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable no-underscore-dangle */
-        aucId = eventList[0].returnValues._auctionId;
+        aucId = eventList[0].returnValues._listingId;
         assert.equal(eventList[0].returnValues._seller, seller);
         /* eslint-enable no-underscore-dangle */
       });
@@ -54,13 +54,13 @@ contract('IntegralAuction', (accounts) => {
         assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
       });
 
-      it('adds a new auction to the auctions mapping', async () => {
-        const res = await iac.auctions.call(aucId);
+      it('adds a new listing to the listings mapping', async () => {
+        const res = await iac.listings.call(aucId);
         assert(res[0].eqn(1)); // state
         assert(res[1].eq(ETHER)); // ethValue
       });
 
-      it('errors if auction already exists', async () => {
+      it('errors if listing already exists', async () => {
         try {
           await iac.open(
             constants.GOOD.PARTIAL_TX,
@@ -71,7 +71,7 @@ contract('IntegralAuction', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'Auction exists.');
+          assert.include(e.message, 'Listing exists.');
         }
       });
     });
@@ -95,7 +95,7 @@ contract('IntegralAuction', (accounts) => {
         }
       });
 
-      it('returns on success and emits AuctionClosed', async () => {
+      it('returns on success and emits ListingClosed', async () => {
         const blockNumber = await web3.eth.getBlock('latest').number;
 
         await iac.claim(
@@ -110,19 +110,19 @@ contract('IntegralAuction', (accounts) => {
         );
 
         const eventList = await iac.getPastEvents(
-          'AuctionClosed',
+          'ListingClosed',
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable-next-line no-underscore-dangle */
-        assert.equal(eventList[0].returnValues._auctionId, aucId);
+        assert.equal(eventList[0].returnValues._listingId, aucId);
       });
 
-      it('updates auction state to CLOSED', async () => {
-        const res = await iac.auctions.call(aucId);
+      it('updates listing state to CLOSED', async () => {
+        const res = await iac.listings.call(aucId);
         assert(res[0].eqn(2));
       });
 
-      it('errors if auction state is not ACTIVE', async () => {
+      it('errors if listing state is not ACTIVE', async () => {
         try {
           await iac.claim(
             constants.GOOD.PROOF,
@@ -136,7 +136,7 @@ contract('IntegralAuction', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'Auction has closed or does not exist.');
+          assert.include(e.message, 'Listing has closed or does not exist.');
         }
       });
 
@@ -160,7 +160,7 @@ contract('IntegralAuction', (accounts) => {
           { from: seller }
         );
         const eventList = await iac.getPastEvents(
-          'AuctionClosed',
+          'ListingClosed',
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable-next-line no-underscore-dangle */

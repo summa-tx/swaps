@@ -5,10 +5,10 @@ import {BTCUtils} from "bitcoin-spv/contracts/BTCUtils.sol";
 import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
 import {ValidateSPV} from "bitcoin-spv/contracts/ValidateSPV.sol";
 
-interface IAuction {
+interface IStatelessSwap {
 
-    event AuctionActive(
-        bytes32 indexed _auctionId,
+    event ListingActive(
+        bytes32 indexed _listingId,
         address indexed _seller,
         address indexed _asset,
         uint256 _value,
@@ -16,15 +16,15 @@ interface IAuction {
         uint256 _reqDiff
     );
 
-    event AuctionClosed(
-        bytes32 indexed _auctionId,
+    event ListingClosed(
+        bytes32 indexed _listingId,
         address _seller,
         address indexed _bidder,
         address indexed _asset,
         uint256 _value
     );
 
-    /// @notice                 Seller opens auction by committing ethereum
+    /// @notice                 Seller opens listing by committing ethereum
     /// @param _partialTx       Seller's partial transaction
     /// @param _reqDiff         Minimum acceptable block difficulty summation
     /// @param _asset           The address of the asset contract. address(0) for ETH
@@ -94,7 +94,7 @@ interface IAuction {
 }
 
 
-contract IntegralAuction is IAuction {
+contract StatelessSwap is IStatelessSwap {
 
     using BTCUtils for bytes;
     using BTCUtils for uint256;
@@ -103,10 +103,10 @@ contract IntegralAuction is IAuction {
     using ValidateSPV for bytes;
     using ValidateSPV for bytes32;
 
-    enum AuctionStates { NONE, ACTIVE, CLOSED }
+    enum ListingStates { NONE, ACTIVE, CLOSED }
 
-    struct Auction {
-        AuctionStates state;
+    struct Listing {
+        ListingStates state;
         uint256 value;                      // Asset amount or 721 ID
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
         address asset;                      // Asset info
@@ -118,16 +118,16 @@ contract IntegralAuction is IAuction {
     }
 
     address payable public developer;
-    mapping(bytes32 => Auction) public auctions;
+    mapping(bytes32 => Listing) public listings;
 
     constructor (address _developer) public {
         developer = address(uint160(_developer));
     }
 
     function ensureFunding(address _asset, uint256 _value) internal;
-    function distribute(Auction storage _auction) internal;
+    function distribute(Listing storage _listing) internal;
 
-    /// @notice                 Seller opens auction by committing ethereum
+    /// @notice                 Seller opens listing by committing ethereum
     /// @param _partialTx       Seller's partial transaction
     /// @param _reqDiff         Minimum acceptable block difficulty summation
     /// @param _asset           The address of the asset contract. address(0) for ETH
@@ -142,29 +142,29 @@ contract IntegralAuction is IAuction {
 
         ensureFunding(_asset, _value);
 
-        // Auction identifier is keccak256 of Seller's parital transaction
-        bytes32 _auctionId = keccak256(_partialTx.slice(7, 36));
+        // Listing identifier is keccak256 of Seller's parital transaction
+        bytes32 _listingId = keccak256(_partialTx.slice(7, 36));
 
-        // Require unique auction identifier
-        require(auctions[_auctionId].state == AuctionStates.NONE, "Auction exists.");
+        // Require unique listing identifier
+        require(listings[_listingId].state == ListingStates.NONE, "Listing exists.");
 
-        // Add to auctions mapping
-        auctions[_auctionId].state = AuctionStates.ACTIVE;
-        auctions[_auctionId].value = _value;
-        auctions[_auctionId].asset = _asset;
-        auctions[_auctionId].seller = msg.sender;
-        auctions[_auctionId].reqDiff = _reqDiff;
+        // Add to listings mapping
+        listings[_listingId].state = ListingStates.ACTIVE;
+        listings[_listingId].value = _value;
+        listings[_listingId].asset = _asset;
+        listings[_listingId].seller = msg.sender;
+        listings[_listingId].reqDiff = _reqDiff;
 
-        // Emit AuctionActive event
-        emit AuctionActive(
-            _auctionId,
+        // Emit ListingActive event
+        emit ListingActive(
+            _listingId,
             msg.sender,
             _asset,
             _value,
             _partialTx,
             _reqDiff);
 
-        return _auctionId;
+        return _listingId;
     }
 
     /// @notice             Validate selected bid, bidder claims eth
@@ -194,30 +194,30 @@ contract IntegralAuction is IAuction {
             _locktime,
             _headers);
 
-        bytes32 _auctionId = keccak256(_vin.slice(1, 36));
-        Auction storage _auction = auctions[_auctionId];
+        bytes32 _listingId = keccak256(_vin.slice(1, 36));
+        Listing storage _listing = listings[_listingId];
 
-        // Require auction state to be ACTIVE and difficulty to be sufficient
-        require(_diff >= _auction.reqDiff, "Not enough difficulty in header chain.");
-        require(_auction.state == AuctionStates.ACTIVE, "Auction has closed or does not exist.");
+        // Require listing state to be ACTIVE and difficulty to be sufficient
+        require(_diff >= _listing.reqDiff, "Not enough difficulty in header chain.");
+        require(_listing.state == ListingStates.ACTIVE, "Listing has closed or does not exist.");
         address _bidder = _extractBidder(_vout);
         if (_bidder == address(0)) {
-            _bidder = _auction.seller;
+            _bidder = _listing.seller;
         }
 
-        // Update auction state
-        _auction.bidder = _bidder;
-        _auction.state = AuctionStates.CLOSED;
+        // Update listing state
+        _listing.bidder = _bidder;
+        _listing.state = ListingStates.CLOSED;
 
-        distribute(_auction);
+        distribute(_listing);
 
-        // Emit AuctionClosed event
-        emit AuctionClosed(
-            _auctionId,
-            _auction.seller,
-            _auction.bidder,
-            _auction.asset,
-            _auction.value
+        // Emit ListingClosed event
+        emit ListingClosed(
+            _listingId,
+            _listing.seller,
+            _listing.bidder,
+            _listing.asset,
+            _listing.value
         );
 
         return true;
@@ -381,7 +381,7 @@ contract IntegralAuction is IAuction {
     }
 
     /// @notice             Calculates the developer's fee
-    /// @dev                Looks up the auction and calculates a 25bps fee. Do not use for erc721.
+    /// @dev                Looks up the listing and calculates a 25bps fee. Do not use for erc721.
     /// @param _value       The amount of value to split between bidder and developer
     /// @return             The fee share and the bidder's share
     function _allocate(uint256 _value) internal pure returns (uint256, uint256) {
@@ -392,7 +392,7 @@ contract IntegralAuction is IAuction {
         return (_feeShare, _bidderShare);
     }
     /// @notice             Calculates the developer's fee
-    /// @dev                Looks up the auction and calculates a 25bps fee. Do not use for erc721.
+    /// @dev                Looks up the listing and calculates a 25bps fee. Do not use for erc721.
     /// @param _value       The amount of value to split between bidder and developer
     /// @return             The fee share and the bidder's share
     function allocate(uint256 _value) external pure returns (uint256, uint256) {

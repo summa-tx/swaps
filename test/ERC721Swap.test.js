@@ -2,13 +2,13 @@
 const BN = require('bn.js');
 const constants = require('./constants.js');
 
-const IntegralAuction721 = artifacts.require('IntegralAuction721');
+const StatelessSwap721 = artifacts.require('StatelessSwap721');
 const DummyERC721 = artifacts.require('DummyERC721');
 
 const ETHER = new BN('1000000000000000000', 10);
 const DIFF = new BN('7019199231177', 10);
 
-contract('IntegralAuction721', (accounts) => {
+contract('StatelessSwap721', (accounts) => {
   const [developer, seller] = accounts;
 
   let iac;
@@ -16,7 +16,7 @@ contract('IntegralAuction721', (accounts) => {
   let erc721address;
 
   before(async () => {
-    iac = await IntegralAuction721.new(developer);
+    iac = await StatelessSwap721.new(developer);
     erc721 = await DummyERC721.new();
     erc721address = erc721.address;
   });

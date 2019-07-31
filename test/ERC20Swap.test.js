@@ -3,7 +3,7 @@
 const BN = require('bn.js');
 const constants = require('./constants.js');
 
-const IntegralAuction20 = artifacts.require('IntegralAuction20');
+const StatelessSwap20 = artifacts.require('StatelessSwap20');
 const DummyERC20 = artifacts.require('DummyERC20');
 
 const ETHER = new BN('1000000000000000000', 10);
@@ -11,7 +11,7 @@ const DIFF = new BN('7019199231177', 10);
 const developerShare = new BN(ETHER.divn(400));
 const bidderShare = new BN(ETHER.sub(developerShare));
 
-contract('IntegralAuction20', (accounts) => {
+contract('StatelessSwap20', (accounts) => {
   const [developer, seller] = accounts;
 
   let iac;
@@ -19,7 +19,7 @@ contract('IntegralAuction20', (accounts) => {
   let erc20address;
 
   before(async () => {
-    iac = await IntegralAuction20.new(developer);
+    iac = await StatelessSwap20.new(developer);
     erc20 = await DummyERC20.new();
     erc20address = erc20.address;
   });

@@ -2,7 +2,7 @@
 const BN = require('bn.js');
 const constants = require('./constants.js');
 
-const IntegralAuctionEth = artifacts.require('IntegralAuctionEth');
+const StatelessSwapEth = artifacts.require('StatelessSwapEth');
 
 const ETHER = new BN('1000000000000000000', 10);
 const DIFF = new BN('7019199231177', 10);
@@ -10,18 +10,18 @@ const developerShare = new BN(ETHER.divn(400));
 const bidderShare = new BN(ETHER.sub(developerShare));
 
 
-contract('IntegralAuctionEth', (accounts) => {
+contract('StatelessSwapEth', (accounts) => {
   const [developer, seller] = accounts;
 
   let iac;
 
   before(async () => {
-    iac = await IntegralAuctionEth.new(developer);
+    iac = await StatelessSwapEth.new(developer);
   });
 
   describe('stateful tests', async () => {
     describe('#open', async () => {
-      it('errors if auction was not funded', async () => {
+      it('errors if listing was not funded', async () => {
         try {
           await iac.open(
             constants.GOOD.PARTIAL_TX,
@@ -32,7 +32,7 @@ contract('IntegralAuctionEth', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'No asset received. Auction must be funded on initialization.');
+          assert.include(e.message, 'No asset received. Listing must be funded on initialization.');
         }
       });
 
@@ -47,7 +47,7 @@ contract('IntegralAuctionEth', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'asset must be zero address for ether auctions.');
+          assert.include(e.message, 'asset must be zero address for ether listings.');
         }
       });
 
