@@ -25,16 +25,21 @@ contract StatelessSwapEth is StatelessSwap {
     /// @dev                Calls allocate to calculate shares
     /// @param _listing     A pointer to the listing
     function distribute(Listing storage _listing) internal {
-        // Calculate fee and bidder shares
-        uint256 _feeShare;
-        uint256 _bidderShare;
-        (_feeShare, _bidderShare) = _allocate(_listing.value);
+        if (_listing.bidder == _listing.seller) {
+            // No fee for cancellation
+            address(uint160(_listing.seller).transfer(_listing.value));
+        } else {
+            // Calculate fee and bidder shares
+            uint256 _feeShare;
+            uint256 _bidderShare;
+            (_feeShare, _bidderShare) = _allocate(_listing.value);
 
-        // Transfer fee
-        address(developer).transfer(_feeShare);
+            // Transfer fee
+            address(developer).transfer(_feeShare);
 
-        // Transfer eth to selected bidder
-        address(uint160(_listing.bidder)).transfer(_bidderShare);
+            // Transfer eth to selected bidder
+            address(uint160(_listing.bidder)).transfer(_bidderShare);
+        }
     }
 }
 
@@ -61,23 +66,30 @@ contract StatelessSwap20 is StatelessSwap {
     /// @dev                Calls allocate to calculate shares
     /// @param _listing     A pointer to the listing
     function distribute(Listing storage _listing) internal {
-        // Calculate fee and bidder shares
-        uint256 _feeShare;
-        uint256 _bidderShare;
-        (_feeShare, _bidderShare) = _allocate(_listing.value);
+        if (_listing.bidder == _listing.seller) {
+            // No fee for cancellation
+            require(
+                IERC20(_listing.asset).transfer(_listing.seller, _listing.value),
+                "Cancellation transfer failed");
+        } else {
+            // Calculate fee and bidder shares
+            uint256 _feeShare;
+            uint256 _bidderShare;
+            (_feeShare, _bidderShare) = _allocate(_listing.value);
 
-        // send developer fee
-        require(
-            IERC20(_listing.asset).transfer(
-                developer, _feeShare),
-            "Developer transfer failed."
-        );
+            // send developer fee
+            require(
+                IERC20(_listing.asset).transfer(
+                    developer, _feeShare),
+                "Developer transfer failed."
+            );
 
-        // send bidder proceeds
-        require(
-            IERC20(_listing.asset).transfer(_listing.bidder, _bidderShare),
-            "Bidder transfer failed."
-        );
+            // send bidder proceeds
+            require(
+                IERC20(_listing.asset).transfer(_listing.bidder, _bidderShare),
+                "Bidder transfer failed."
+            );
+        }
     }
 }
 

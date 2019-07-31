@@ -391,6 +391,7 @@ contract StatelessSwap is IStatelessSwap {
         uint256 _bidderShare = _value.sub(_feeShare);
         return (_feeShare, _bidderShare);
     }
+    
     /// @notice             Calculates the developer's fee
     /// @dev                Looks up the listing and calculates a 25bps fee. Do not use for erc721.
     /// @param _value       The amount of value to split between bidder and developer

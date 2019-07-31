@@ -10,7 +10,7 @@ contract Nonfungiblizer {
     address asset = address(0);
 
     function init(address _asset, uint256 _value) public {
-        require(_asset == address(0), "no 0 asset");
+        require(_asset != address(0), "no 0 asset");
         require(_value > 0, "_value must be greater than 0");
         require(
             IERC20(_asset).transferFrom(msg.sender, address(this), _value),
