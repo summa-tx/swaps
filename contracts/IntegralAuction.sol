@@ -330,11 +330,10 @@ contract IntegralAuction is IAuction {
     function _checkHeaders(
         bytes memory _headers
     ) internal pure returns (uint256 _diff, bytes32 _merkleRoot) {
-        // Require summation of submitted block headers difficulty >= reqDiff
         _diff = _headers.validateHeaderChain();
-        require(_diff != 1, "Header bytes not multiple of 80.");
-        require(_diff != 2, "Header bytes not a valid chain.");
-        require(_diff != 3, "Header does not meet its own difficulty target.");
+        require(_diff != ValidateSPV.getErrBadLength(), "Header bytes not multiple of 80.");
+        require(_diff != ValidateSPV.getErrInvalidChain(), "Header bytes not a valid chain.");
+        require(_diff != ValidateSPV.getErrLowWork(), "Header does not meet its own difficulty target.");
         _merkleRoot = _headers.extractMerkleRootLE().toBytes32();
     }
 
