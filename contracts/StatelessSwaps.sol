@@ -1,8 +1,10 @@
 pragma solidity ^0.5.10;
 
+import {Factory} from "./CloneFactory.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {IERC721} from "./interfaces/IERC721.sol";
 import {StatelessSwap} from "./StatelessSwap.sol";
+import {Nonfungiblizer} from "./Nonfungiblizer.sol";
 
 
 contract StatelessSwapEth is StatelessSwap {
@@ -12,13 +14,12 @@ contract StatelessSwapEth is StatelessSwap {
 
     /// @notice             Ensures that ether is paid in
     /// @dev                User must pass in address(0) and the amount of ether
-    /// @param _asset       Must be address(0)
-    /// @param _value       The amount of ether in msg.value
-    function ensureFunding (address _asset, uint256 _value) internal {
+    /// @param _listing    The listing object to   in msgthat we expect to be funded
+    function ensureFunding (Listing storage _listing) internal {
         // Require Seller to fund tx
         require(msg.value > 0, "No asset received. Listing must be funded on initialization.");
-        require(_asset == address(0), "asset must be zero address for ether listings.");
-        require(_value == msg.value, "value must equal msg.value");
+        require(_listing.asset == address(0), "asset must be zero address for ether listings.");
+        require(_listing.value == msg.value, "value must equal msg.value");
     }
 
     /// @notice             Transfers ETH to the bidder and developer
@@ -27,7 +28,7 @@ contract StatelessSwapEth is StatelessSwap {
     function distribute(Listing storage _listing) internal {
         if (_listing.bidder == _listing.seller) {
             // No fee for cancellation
-            address(uint160(_listing.seller).transfer(_listing.value));
+            address(uint160(_listing.seller)).transfer(_listing.value);
         } else {
             // Calculate fee and bidder shares
             uint256 _feeShare;
@@ -50,13 +51,12 @@ contract StatelessSwap20 is StatelessSwap {
 
     /// @notice             Ensures that the tokens are transferred
     /// @dev                Calls transferFrom on the erc20 contract, and checks that no ether is being burnt
-    /// @param _asset       The address of the erc20 token contract
-    /// @param _value       The number of tokens to transfer
-    function ensureFunding(address _asset, uint256 _value) internal {
+    /// @param _listing     The listing that we expect to be funded
+    function ensureFunding (Listing storage _listing) internal {
         require(msg.value == 0, "Do not burn ether here please");
-        require(_value > 0, "_value must be greater than 0");
+        require(_listing.value > 0, "_value must be greater than 0");
         require(
-            IERC20(_asset).transferFrom(msg.sender, address(this), _value),
+            IERC20(_listing.asset).transferFrom(msg.sender, address(this), _listing.value),
             "transferFrom failed"
         );
     }
@@ -100,11 +100,10 @@ contract StatelessSwap721 is StatelessSwap {
 
     /// @notice             Ensures that the NFT is transferred
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
-    /// @param _asset       The address of the erc721 token contract
-    /// @param _value       The ID number of the token to transfer
-    function ensureFunding(address _asset, uint256 _value) internal {
+    /// @param _listing     The listing that we expect to be funded
+    function ensureFunding (Listing storage _listing) internal {
         require(msg.value == 0, "Do not burn ether here please");
-        IERC721(_asset).transferFrom(msg.sender, address(this), _value);
+        IERC721(_listing.asset).transferFrom(msg.sender, address(this), _listing.value);
     }
 
     /// @notice             Transfers the NFT to the bidder
@@ -115,4 +114,32 @@ contract StatelessSwap721 is StatelessSwap {
         IERC721(_listing.asset).transferFrom(
             address(this), _listing.bidder, _listing.value);
     }
+}
+
+contract StatelessSwapNonfungibilized is StatelessSwap, Factory {
+
+    address implementation;
+
+    constructor (address _developer, address _implementation) public StatelessSwap(_developer) {
+        implementation = _implementation;
+    }
+
+    /// @notice             Ensures that the NFT is transferred
+    /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
+    /// @param _listing     The listing that we expect to be funded
+    function ensureFunding (Listing storage _listing) internal {
+        _listing.wrapper = createClone(implementation);
+        Nonfungiblizer(_listing.wrapper).init(developer, _listing.asset);
+        require(
+            IERC20(_listing.asset).transferFrom(msg.sender, _listing.wrapper, _listing.value),
+            "Funding transfer failed");
+    }
+
+    /// @notice             Transfers the Nonfungiblizer wrapper to the bidder
+    /// @dev                Calls transfer on the Nonfungiblizer contract
+    /// @param _listing     A pointer to the listing
+    function distribute(Listing storage _listing) internal {
+        Nonfungiblizer(_listing.wrapper).transfer(_listing.bidder);
+    }
+
 }

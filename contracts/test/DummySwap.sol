@@ -6,8 +6,8 @@ contract DummySwap is StatelessSwap {
 
     constructor (address _developer) public StatelessSwap(_developer) {}
 
-    function ensureFunding(address _asset, uint256 _value) internal {
-        _asset; _value;
+    function ensureFunding(Listing storage _listing) internal {
+        _listing;
     }
 
     function distribute(Listing storage _listing) internal {

@@ -111,6 +111,7 @@ contract StatelessSwap is IStatelessSwap {
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
         address asset;                      // Asset info
         address seller;                     // Seller address
+        address wrapper;                    // For Nonfungiblized
 
         // Filled Later
         address bidder;                     // Accepted bidder address
@@ -124,7 +125,7 @@ contract StatelessSwap is IStatelessSwap {
         developer = address(uint160(_developer));
     }
 
-    function ensureFunding(address _asset, uint256 _value) internal;
+    function ensureFunding(Listing storage _listing) internal;
     function distribute(Listing storage _listing) internal;
 
     /// @notice                 Seller opens listing by committing ethereum
@@ -139,10 +140,7 @@ contract StatelessSwap is IStatelessSwap {
         address _asset,
         uint256 _value
     ) external payable returns (bytes32) {
-
-        ensureFunding(_asset, _value);
-
-        // Listing identifier is keccak256 of Seller's parital transaction
+        // Listing identifier is keccak256 of Seller's partial transaction outpoint
         bytes32 _listingId = keccak256(_partialTx.slice(7, 36));
 
         // Require unique listing identifier
@@ -154,6 +152,8 @@ contract StatelessSwap is IStatelessSwap {
         listings[_listingId].asset = _asset;
         listings[_listingId].seller = msg.sender;
         listings[_listingId].reqDiff = _reqDiff;
+
+        ensureFunding(listings[_listingId]);
 
         // Emit ListingActive event
         emit ListingActive(
@@ -391,7 +391,7 @@ contract StatelessSwap is IStatelessSwap {
         uint256 _bidderShare = _value.sub(_feeShare);
         return (_feeShare, _bidderShare);
     }
-    
+
     /// @notice             Calculates the developer's fee
     /// @dev                Looks up the listing and calculates a 25bps fee. Do not use for erc721.
     /// @param _value       The amount of value to split between bidder and developer

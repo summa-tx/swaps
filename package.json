@@ -4,7 +4,9 @@
   "description": "ETH <=> BTC trades",
   "scripts": {
     "coverage": "npx solidity-coverage",
+    "compile": "truffle compile",
     "lint": "solium -d contracts/ && eslint ./test",
+    "lint:fix": "solium --fix -d contracts/ && eslint --fix ./test",
     "test": "truffle test"
   },
   "author": "James Prestwich",
