@@ -118,17 +118,17 @@ contract StatelessSwap721 is StatelessSwap {
 
 contract StatelessSwapNoFun is StatelessSwap, Factory {
 
-    address implementation;
+    address noFun;  // The NoFun implementation for cloning
 
-    constructor (address _developer, address _implementation) public StatelessSwap(_developer) {
-        implementation = _implementation;
+    constructor (address _developer, address _noFun) public StatelessSwap(_developer) {
+        noFun = _noFun;
     }
 
     /// @notice             Ensures that the Tokens are transferred to a new wrapper
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
     /// @param _listing     The listing that we expect to be funded
     function ensureFunding (Listing storage _listing) internal {
-        _listing.wrapper = createClone(implementation);
+        _listing.wrapper = createClone(noFun);
         NoFun(_listing.wrapper).init(developer, _listing.asset);
         require(
             IERC20(_listing.asset).transferFrom(msg.sender, _listing.wrapper, _listing.value),
