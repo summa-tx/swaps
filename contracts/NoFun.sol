@@ -3,7 +3,7 @@ pragma solidity ^0.5.10;
 import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
 
-contract Nonfungiblizer {
+contract NoFun {
     using SafeMath for uint256;
 
     address developer;

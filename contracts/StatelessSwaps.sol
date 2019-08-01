@@ -4,7 +4,7 @@ import {Factory} from "./CloneFactory.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {IERC721} from "./interfaces/IERC721.sol";
 import {StatelessSwap} from "./StatelessSwap.sol";
-import {Nonfungiblizer} from "./Nonfungiblizer.sol";
+import {NoFun} from "./NoFun.sol";
 
 
 contract StatelessSwapEth is StatelessSwap {
@@ -116,7 +116,7 @@ contract StatelessSwap721 is StatelessSwap {
     }
 }
 
-contract StatelessSwapNonfungibilized is StatelessSwap, Factory {
+contract StatelessSwapNoFun is StatelessSwap, Factory {
 
     address implementation;
 
@@ -124,22 +124,22 @@ contract StatelessSwapNonfungibilized is StatelessSwap, Factory {
         implementation = _implementation;
     }
 
-    /// @notice             Ensures that the NFT is transferred
+    /// @notice             Ensures that the Tokens are transferred to a new wrapper
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
     /// @param _listing     The listing that we expect to be funded
     function ensureFunding (Listing storage _listing) internal {
         _listing.wrapper = createClone(implementation);
-        Nonfungiblizer(_listing.wrapper).init(developer, _listing.asset);
+        NoFun(_listing.wrapper).init(developer, _listing.asset);
         require(
             IERC20(_listing.asset).transferFrom(msg.sender, _listing.wrapper, _listing.value),
             "Funding transfer failed");
     }
 
-    /// @notice             Transfers the Nonfungiblizer wrapper to the bidder
-    /// @dev                Calls transfer on the Nonfungiblizer contract
+    /// @notice             Transfers the NoFun wrapper to the bidder
+    /// @dev                Calls transfer on the NoFun contract
     /// @param _listing     A pointer to the listing
     function distribute(Listing storage _listing) internal {
-        Nonfungiblizer(_listing.wrapper).transfer(_listing.bidder);
+        NoFun(_listing.wrapper).transfer(_listing.bidder);
     }
 
 }
