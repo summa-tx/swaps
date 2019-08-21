@@ -8,7 +8,7 @@ import {ValidateSPV} from "bitcoin-spv/contracts/ValidateSPV.sol";
 interface IStatelessSwap {
 
     event ListingActive(
-        bytes32 indexed _listingId,
+        bytes32 indexed _listingID,
         address indexed _seller,
         address indexed _asset,
         uint256 _value,
@@ -17,7 +17,7 @@ interface IStatelessSwap {
     );
 
     event ListingClosed(
-        bytes32 indexed _listingId,
+        bytes32 indexed _listingID,
         address _seller,
         address indexed _bidder,
         address indexed _asset,
@@ -111,7 +111,7 @@ contract StatelessSwap is IStatelessSwap {
         uint256 reqDiff;                    // Required number of difficulty in confirmed blocks
         address asset;                      // Asset info
         address seller;                     // Seller address
-        address wrapper;                    // For Nonfungiblized
+        address wrapper;                    // The new NoFun (if applicable)
 
         // Filled Later
         address bidder;                     // Accepted bidder address
@@ -125,6 +125,7 @@ contract StatelessSwap is IStatelessSwap {
         developer = address(uint160(_developer));
     }
 
+    // IMPLEMENT FOR SPECIFIC ASSET TYPES
     function ensureFunding(Listing storage _listing) internal;
     function distribute(Listing storage _listing) internal;
 
@@ -141,30 +142,32 @@ contract StatelessSwap is IStatelessSwap {
         uint256 _value
     ) external payable returns (bytes32) {
         // Listing identifier is keccak256 of Seller's partial transaction outpoint
-        bytes32 _listingId = keccak256(_partialTx.slice(7, 36));
+        bytes32 _listingID = keccak256(_partialTx.slice(7, 36));
 
         // Require unique listing identifier
-        require(listings[_listingId].state == ListingStates.NONE, "Listing exists.");
+        require(listings[_listingID].state == ListingStates.NONE, "Listing exists.");
 
         // Add to listings mapping
-        listings[_listingId].state = ListingStates.ACTIVE;
-        listings[_listingId].value = _value;
-        listings[_listingId].asset = _asset;
-        listings[_listingId].seller = msg.sender;
-        listings[_listingId].reqDiff = _reqDiff;
+        listings[_listingID].state = ListingStates.ACTIVE;
+        listings[_listingID].value = _value;
+        if (_asset != address(0)) {
+            listings[_listingID].asset = _asset;
+        }
+        listings[_listingID].seller = msg.sender;
+        listings[_listingID].reqDiff = _reqDiff;
 
-        ensureFunding(listings[_listingId]);
+        ensureFunding(listings[_listingID]);
 
         // Emit ListingActive event
         emit ListingActive(
-            _listingId,
+            _listingID,
             msg.sender,
             _asset,
             _value,
             _partialTx,
             _reqDiff);
 
-        return _listingId;
+        return _listingID;
     }
 
     /// @notice             Validate selected bid, bidder claims eth
@@ -194,8 +197,8 @@ contract StatelessSwap is IStatelessSwap {
             _locktime,
             _headers);
 
-        bytes32 _listingId = keccak256(_vin.slice(1, 36));
-        Listing storage _listing = listings[_listingId];
+        bytes32 _listingID = keccak256(_vin.slice(1, 36));
+        Listing storage _listing = listings[_listingID];
 
         // Require listing state to be ACTIVE and difficulty to be sufficient
         require(_diff >= _listing.reqDiff, "Not enough difficulty in header chain.");
@@ -213,7 +216,7 @@ contract StatelessSwap is IStatelessSwap {
 
         // Emit ListingClosed event
         emit ListingClosed(
-            _listingId,
+            _listingID,
             _listing.seller,
             _listing.bidder,
             _listing.asset,

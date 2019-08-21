@@ -3,14 +3,16 @@ pragma solidity ^0.5.10;
 import {NoFun} from "./NoFun.sol";
 import {Factory} from "./CloneFactory.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
+import {CallbackSwap} from "./CallbackSwap.sol";
 import {IERC721} from "./interfaces/IERC721.sol";
-import {StatelessSwap} from "./StatelessSwap.sol";
 
 
-contract StatelessSwapEth is StatelessSwap {
+contract CallbackSwapEth is CallbackSwap {
 
-    /* solium-disable-next-line */
-    constructor (address _developer) public StatelessSwap(_developer) {}
+    constructor (
+        address _developer,
+        address _proofProvider
+    ) public CallbackSwap(_developer, _proofProvider) {}
 
     /// @notice             Ensures that ether is paid in
     /// @dev                User must pass in address(0) and the amount of ether
@@ -44,10 +46,13 @@ contract StatelessSwapEth is StatelessSwap {
     }
 }
 
-contract StatelessSwap20 is StatelessSwap {
 
-    /* solium-disable-next-line */
-    constructor (address _developer) public StatelessSwap(_developer) {}
+contract CallbackSwap20 is CallbackSwap {
+
+    constructor (
+        address _developer,
+        address _proofProvider
+    ) public CallbackSwap(_developer, _proofProvider) {}
 
     /// @notice             Ensures that the tokens are transferred
     /// @dev                Calls transferFrom on the erc20 contract, and checks that no ether is being burnt
@@ -93,10 +98,13 @@ contract StatelessSwap20 is StatelessSwap {
     }
 }
 
-contract StatelessSwap721 is StatelessSwap {
 
-    /* solium-disable-next-line */
-    constructor (address _developer) public StatelessSwap(_developer) {}
+contract CallbackSwap721 is CallbackSwap {
+
+    constructor (
+        address _developer,
+        address _proofProvider
+    ) public CallbackSwap(_developer, _proofProvider) {}
 
     /// @notice             Ensures that the NFT is transferred
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
@@ -116,13 +124,18 @@ contract StatelessSwap721 is StatelessSwap {
     }
 }
 
-contract StatelessSwapNoFun is StatelessSwap, Factory {
+contract CallbackSwapNoFun is CallbackSwap, Factory {
 
     address noFun;  // The NoFun implementation for cloning
 
-    constructor (address _developer, address _noFun) public StatelessSwap(_developer) {
+    constructor (
+        address _developer,
+        address _proofProvider,
+        address _noFun
+    ) public CallbackSwap(_developer, _proofProvider) {
         noFun = _noFun;
     }
+
 
     /// @notice             Ensures that the Tokens are transferred to a new wrapper
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
