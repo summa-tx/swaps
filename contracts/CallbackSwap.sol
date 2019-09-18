@@ -5,58 +5,58 @@ import {BTCUtils} from "bitcoin-spv/contracts/BTCUtils.sol";
 import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
 
 interface ISPVConsumer {
-    function filterCallback(
+    function spv(
         bytes32 _txid,
         bytes calldata _vin,
         bytes calldata _vout,
-        uint256 _filterID
+        uint256 _requestID,
+        uint16 _reqIndices
     ) external;
 }
 
 interface IOnDemandSPV {
-    event NewProofFilter (
+    event NewProofRequest (
         address indexed _requester,
-        uint256 indexed _filterID,
+        uint256 indexed _requestID,
         uint64 _paysValue,
         bytes _spends,
         bytes _pays
     );
     event SubscriptionExpired(address indexed _owner);
-    event FilterClosed(uint256 indexed _filterID);
+    event RequestClosed(uint256 indexed _requestID);
+    event RequestFilled(bytes32 indexed _txid, uint256 indexed _requestID);
 
-    /// @notice                 Subscribe to a feed of Bitcoin txns matching a filter
-    /// @dev                    The filter can be a spent utxo and/or a created utxo
-    /// @param  _filterID       A unique ID for the new filter
+    /// @notice                 Subscribe to a feed of Bitcoin txns matching a request
+    /// @dev                    The request can be a spent utxo and/or a created utxo
     /// @param  _spends         An outpoint that must be spent in acceptable txns (optional)
     /// @param  _pays           A scripthash that must be paid in acceptable txns (optional)
     /// @param  _paysValue      A minimum value that must be paid to the scripthash (optional)
-    /// @param  _consumer       The address of a ISPVConsumer exposing filterCallback
+    /// @param  _consumer       The address of a ISPVConsumer exposing spv
     /// @return                 True if succesful, error otherwise
-    function newFilter(
-        uint256 _filterID,
+    function request(
         bytes calldata _spends,
         bytes calldata _pays,
         uint64 _paysValue,
         address _consumer
-    ) external returns (bool);
+    ) external returns (uint256);
 
-    /// @notice                 Cancel a subscription to a filter, retrieve the deposit
+    /// @notice                 Cancel a subscription to a request, retrieve the deposit
     /// @dev                    10% of the deposit is withheld as fee for service
-    /// @param  _filterID       The id of the filter to cancel
+    /// @param  _requestID      The id of the request to cancel
     /// @return                 True if succesful, error otherwise
-    function cancelSubscription(uint256 _filterID) external returns (bool);
+    function cancelSubscription(uint256 _requestID) external returns (bool);
 
-    /// @notice                 Provide a proof of a tx that satisfies some filter
-    /// @dev                    The caller must specify which inputs, which outputs, and which filter
+    /// @notice                 Provide a proof of a tx that satisfies some request
+    /// @dev                    The caller must specify which inputs, which outputs, and which request
     /// @param  _header         The header containing the merkleroot committing to the tx
     /// @param  _proof          The merkle proof intermediate nodes
     /// @param  _version        The tx version, always the first 4 bytes of the tx
     /// @param  _locktime       The tx locktime, always the last 4 bytes of the tx
     /// @param  _index          The index of the tx in the merkle tree's leaves
-    /// @param  _filterIndices  The input and output index to check against the filter, packed
+    /// @param  _reqIndices  The input and output index to check against the request, packed
     /// @param  _vin            The tx input vector
     /// @param  _vout           The tx output vector
-    /// @param  _filterID       The id of the filter that has been triggered
+    /// @param  _requestID       The id of the request that has been triggered
     /// @return                 True if succesful, error otherwise
     function provideProof(
         bytes calldata _header,
@@ -64,10 +64,10 @@ interface IOnDemandSPV {
         bytes4 _version,
         bytes4 _locktime,
         uint256 _index,
-        uint16 _filterIndices,
+        uint16 _reqIndices,
         bytes calldata _vin,
         bytes calldata _vout,
-        uint256 _filterID
+        uint256 _requestID
     ) external returns (bool);
 }
 
@@ -109,7 +109,6 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
         address asset;                      // Asset info
         address seller;                     // Seller address
         address wrapper;                    // The new NoFun (if applicable)
-        uint256 filterID;
 
         // Filled Later
         address bidder;                     // Accepted bidder address
@@ -137,7 +136,6 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
         // Listing identifier is keccak256 of Seller's partial transaction outpoint
         bytes memory _outpoint = _partialTx.slice(7, 36);
         bytes32 _listingID = keccak256(_outpoint);
-        uint256 _filterID = uint256(keccak256(abi.encodePacked(_outpoint, msg.sender, block.timestamp)));
 
         // Require unique listing identifier
         require(listings[_listingID].state == ListingStates.NONE, "Listing exists.");
@@ -152,10 +150,9 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
 
         ensureFunding(listings[_listingID]);
 
-        // Register a new filter for
-        proofProvider.newFilter(
-            _filterID,
-            _outpoint,
+        // Register a new request for the outpoint
+        proofProvider.request(
+            _outpoint,  // spends
             hex"",  // pays
             0,  // paysValue
             address(this));  // consumer
@@ -171,19 +168,19 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
         return _listingID;
     }
 
-    function filterCallback(
+    function spv(
         bytes32 _txid,
         bytes calldata _vin,
         bytes calldata _vout,
-        uint256 _filterID
+        uint256 _requestID,
+        uint16 _reqIndices
     ) external {
-        _txid; // silences compile warnings
+        _requestID; _reqIndices; _txid; // silences compile warnings
         require(msg.sender == address(proofProvider), "Not the SPV provider");
 
         bytes32 _listingID = keccak256(_vin.slice(1, 36));
 
         Listing storage _listing = listings[_listingID];
-        require(_filterID == _listing.filterID, "Wrong filter ID");
         require(_listing.state == ListingStates.ACTIVE, "Listing has closed or does not exist.");
 
         address _bidder = _extractBidder(_vout);
