@@ -93,7 +93,6 @@ interface IStatelessSwap {
     ) external pure returns (bool);
 }
 
-
 contract StatelessSwap is IStatelessSwap {
 
     using BTCUtils for bytes;

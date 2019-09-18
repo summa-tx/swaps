@@ -13,7 +13,6 @@ interface ISPVConsumer {
     ) external;
 }
 
-
 interface IOnDemandSPV {
     event NewProofFilter (
         address indexed _requester,
@@ -71,7 +70,6 @@ interface IOnDemandSPV {
         uint256 _filterID
     ) external returns (bool);
 }
-
 
 interface ICallbackSwap {
 
