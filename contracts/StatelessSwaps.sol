@@ -141,5 +141,4 @@ contract StatelessSwapNoFun is StatelessSwap, Factory {
     function distribute(Listing storage _listing) internal {
         NoFun(_listing.wrapper).transfer(_listing.bidder);
     }
-
 }

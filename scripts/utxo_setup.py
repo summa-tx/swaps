@@ -4,7 +4,7 @@ from riemann import simple
 def generate_small_utxos(tx_id, index, prevout_value, recipient_addr,
                          num_outputs, fee, change_addr, size=550):
     '''
-    Makes new utxos. Useful for multidutch, or pre-stocking an app
+    Makes new utxos.
     All utxos have the same address (i.e. the same keypair)
 
     Args:
