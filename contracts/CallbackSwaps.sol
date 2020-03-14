@@ -130,7 +130,7 @@ contract CallbackSwapNoFun is CallbackSwap, Factory {
     }
 
     /// @notice             Ensures that the Tokens are transferred to a new wrapper
-    /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
+    /// @dev                Calls transferFrom on the erc20 contract,
     /// @param _listing     The listing that we expect to be funded
     function ensureFunding (Listing storage _listing) internal {
         _listing.wrapper = createClone(noFun);

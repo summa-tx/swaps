@@ -1,10 +1,10 @@
 pragma solidity ^0.5.10;
 
-import {BytesLib} from "bitcoin-spv/contracts/BytesLib.sol";
-import {BTCUtils} from "bitcoin-spv/contracts/BTCUtils.sol";
-import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
-
+import {BytesLib} from "@summa-tx/bitcoin-spv-sol/contracts/BytesLib.sol";
+import {BTCUtils} from "@summa-tx/bitcoin-spv-sol/contracts/BTCUtils.sol";
 import {ISPVConsumer, ISPVRequestManager} from "@summa-tx/relay-sol/contracts/Interfaces.sol";
+
+import {SafeMath} from "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 
 interface ICallbackSwap {
@@ -108,19 +108,18 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
     }
 
     function spv(
-        bytes32 _txid,
+        bytes32,
         bytes calldata _vin,
         bytes calldata _vout,
-        uint256 _requestID,
-        uint16 _reqIndices
+        uint256,
+        uint16
     ) external {
-        _requestID; _reqIndices; _txid; // silences compile warnings
-        require(msg.sender == address(proofProvider), "Not the SPV provider");
+        require(msg.sender == address(proofProvider), "CallbackSwap/spv - Not the SPV provider");
 
         bytes32 _listingID = keccak256(_vin.slice(1, 36));
 
         Listing storage _listing = listings[_listingID];
-        require(_listing.state == ListingStates.ACTIVE, "Listing has closed or does not exist.");
+        require(_listing.state == ListingStates.ACTIVE, "CallbackSwap/spv - Listing has closed or does not exist.");
 
         address _bidder = _extractBidder(_vout);
         if (_bidder == address(0)) {

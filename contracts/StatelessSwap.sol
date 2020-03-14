@@ -1,9 +1,10 @@
 pragma solidity ^0.5.10;
 
-import {BytesLib} from "bitcoin-spv/contracts/BytesLib.sol";
-import {BTCUtils} from "bitcoin-spv/contracts/BTCUtils.sol";
-import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
-import {ValidateSPV} from "bitcoin-spv/contracts/ValidateSPV.sol";
+import {BytesLib} from "@summa-tx/bitcoin-spv-sol/contracts/BytesLib.sol";
+import {BTCUtils} from "@summa-tx/bitcoin-spv-sol/contracts/BTCUtils.sol";
+import {ValidateSPV} from "@summa-tx/bitcoin-spv-sol/contracts/ValidateSPV.sol";
+
+import {SafeMath} from "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 interface IStatelessSwap {
 
@@ -76,7 +77,7 @@ interface IStatelessSwap {
     /// @return             The total difficulty of the header chain, and the first header's tx tree root
     function checkHeaders(
         bytes calldata _headers
-    ) external pure returns (uint256 _diff, bytes32 _merkleRoot);
+    ) external view returns (uint256 _diff, bytes32 _merkleRoot);
 
     /// @notice             Validates submitted merkle inclusion proof
     /// @dev                Takes in the x
@@ -262,7 +263,7 @@ contract StatelessSwap is IStatelessSwap {
         bytes memory _vout,
         bytes memory _locktime,
         bytes memory _headers
-    ) internal pure returns (uint256 _diff) {
+    ) internal view returns (uint256 _diff) {
         bytes32 _merkleRoot;
         bytes32 _txid = _checkTx(_version, _vin, _vout, _locktime);
         (_diff, _merkleRoot) = _checkHeaders(_headers);
@@ -286,7 +287,7 @@ contract StatelessSwap is IStatelessSwap {
         bytes calldata _vout,
         bytes calldata _locktime,
         bytes calldata _headers
-    ) external pure returns (uint256 _diff) {
+    ) external view returns (uint256 _diff) {
         return _makeAllChecks(_proof, _index, _version, _vin, _vout, _locktime, _headers);
     }
 
@@ -331,7 +332,7 @@ contract StatelessSwap is IStatelessSwap {
     /// @return             The total difficulty of the header chain, and the first header's tx tree root
     function _checkHeaders(
         bytes memory _headers
-    ) internal pure returns (uint256 _diff, bytes32 _merkleRoot) {
+    ) internal view returns (uint256 _diff, bytes32 _merkleRoot) {
         _diff = _headers.validateHeaderChain();
         require(_diff != ValidateSPV.getErrBadLength(), "Header bytes not multiple of 80.");
         require(_diff != ValidateSPV.getErrInvalidChain(), "Header bytes not a valid chain.");
@@ -345,7 +346,7 @@ contract StatelessSwap is IStatelessSwap {
     /// @return             The total difficulty of the header chain, and the first header's tx tree root
     function checkHeaders(
         bytes calldata _headers
-    ) external pure returns (uint256 _diff, bytes32 _merkleRoot) {
+    ) external view returns (uint256 _diff, bytes32 _merkleRoot) {
         return _checkHeaders(_headers);
     }
 

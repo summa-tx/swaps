@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 require('dotenv').config();
-const HDWalletProvider = require('truffle-hdwallet-provider');
+const HDWalletProvider = require('@truffle/hdwallet-provider');
 const infuraKey = process.env.SUMMA_RELAY_DEPLOY_INFURA_KEY;
 const mnemonic = process.env.MNEMONIC;
 
