@@ -23,7 +23,7 @@ contract('StatelessSwap', (accounts) => {
 
   describe('#constructor', async () => {
     it('sets the developer address', async () => {
-      assert.equal(await iac.developer.call(), developer);
+      assert.strictEqual(await iac.developer.call(), developer);
     });
   });
 
@@ -45,13 +45,13 @@ contract('StatelessSwap', (accounts) => {
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable no-underscore-dangle */
-        aucId = eventList[0].returnValues._listingId;
-        assert.equal(eventList[0].returnValues._seller, seller);
+        aucId = eventList[0].returnValues._listingID;
+        assert.strictEqual(eventList[0].returnValues._seller, seller);
         /* eslint-enable no-underscore-dangle */
       });
 
       it('returns the txid on success', async () => {
-        assert.equal(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
+        assert.strictEqual(aucId, '0x9ff0076d904f8a7125b063f44995fe0d94f05ba759c435fbeb0f0936fb876432');
       });
 
       it('adds a new listing to the listings mapping', async () => {
@@ -114,7 +114,7 @@ contract('StatelessSwap', (accounts) => {
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable-next-line no-underscore-dangle */
-        assert.equal(eventList[0].returnValues._listingId, aucId);
+        assert.strictEqual(eventList[0].returnValues._listingID, aucId);
       });
 
       it('updates listing state to CLOSED', async () => {
@@ -164,7 +164,7 @@ contract('StatelessSwap', (accounts) => {
           { fromBlock: blockNumber, toBlock: 'latest' }
         );
         /* eslint-disable-next-line no-underscore-dangle */
-        assert.equal(eventList[0].returnValues._bidder, seller);
+        assert.strictEqual(eventList[0].returnValues._bidder, seller);
       });
     });
   });
@@ -180,16 +180,16 @@ contract('StatelessSwap', (accounts) => {
   describe('#extractBidder', async () => {
     it('extracts the bidder from the op_return in the 2nd output', async () => {
       const res = await iac.extractBidder(constants.GOOD.VOUT);
-      assert.equal(res, constants.GOOD.BIDDER);
+      assert.strictEqual(res, constants.GOOD.BIDDER);
     });
 
     it('returns address(0) if there is only 1 output', async () => {
       const res = await iac.extractBidder(constants.FEW_OUTPUTS.VOUT);
-      assert.equal(res, constants.ADDR0);
+      assert.strictEqual(res, constants.ADDR0);
     });
     it('returns address(0) if the 2nd output is not an opreturn', async () => {
       const res = await iac.extractBidder(constants.OP_RETURN_WRONG.VOUT);
-      assert.equal(res, constants.ADDR0);
+      assert.strictEqual(res, constants.ADDR0);
     });
   });
 
@@ -244,7 +244,7 @@ contract('StatelessSwap', (accounts) => {
         constants.GOOD.VOUT,
         constants.GOOD.LOCKTIME
       );
-      assert.equal(res, constants.GOOD.TX_ID_LE);
+      assert.strictEqual(res, constants.GOOD.TX_ID_LE);
     });
   });
 
@@ -279,7 +279,7 @@ contract('StatelessSwap', (accounts) => {
     it('returns diff and merkle root', async () => {
       const res = await iac.checkHeaders(constants.GOOD.HEADER_CHAIN);
       assert(res[0].eq(DIFF.muln(7)));
-      assert.equal(res[1], constants.GOOD.MERKLE_ROOT);
+      assert.strictEqual(res[1], constants.GOOD.MERKLE_ROOT);
     });
   });
 

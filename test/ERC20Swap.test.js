@@ -42,7 +42,7 @@ contract('StatelessSwap20', (accounts) => {
           await iac.open(constants.GOOD.PARTIAL_TX, DIFF, erc20address, ETHER, { from: seller });
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'transferFrom failed');
+          assert.include(e.message, 'SafeERC20: ERC20 operation did not succeed.');
         }
         await erc20.clearError();
       });
@@ -83,7 +83,7 @@ contract('StatelessSwap20', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'Developer transfer failed.');
+          assert.include(e.message, 'SafeERC20: ERC20 operation did not succeed.');
         }
         await erc20.clearError();
       });
@@ -103,7 +103,7 @@ contract('StatelessSwap20', (accounts) => {
           );
           assert(false);
         } catch (e) {
-          assert.include(e.message, 'Bidder transfer failed.');
+          assert.include(e.message, 'SafeERC20: ERC20 operation did not succeed.');
         }
         await erc20.clearError();
       });
