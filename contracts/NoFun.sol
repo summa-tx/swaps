@@ -1,36 +1,41 @@
 pragma solidity ^0.5.10;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {SafeMath} from "bitcoin-spv/contracts/SafeMath.sol";
+
+import {ERC20} from "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
+
+import {SafeMath} from "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract NoFun {
     using SafeMath for uint256;
+    using SafeERC20 for ERC20;
 
     address developer;
     address owner;
     uint256 value;
-    address asset = address(0);
+    ERC20 asset;
 
     function init(address _developer, address _asset) public {
-        require(_asset != address(0), "no 0 asset");
+        require(developer == address(0), "NoFun/init - already init");
+        require(_asset != address(0), "NoFun/init - no 0 asset");
         developer = _developer;
-        asset = _asset;
+        asset = ERC20(_asset);
     }
 
     function withdrawERC20(address _recipient, address _asset) public  {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == owner, "NoFun/withdrawERC20 - only owner");
         uint256 _feeShare;
         uint256 _ownerShare;
 
-        uint256 _balance = IERC20(_asset).balanceOf(address(this));
+        uint256 _balance = ERC20(_asset).balanceOf(address(this));
         (_feeShare, _ownerShare) = _allocate(_balance);
 
-        IERC20(_asset).transfer(_recipient, _ownerShare);
-        IERC20(_asset).transfer(developer, _feeShare);
+        ERC20(_asset).safeTransfer(_recipient, _ownerShare);
+        ERC20(_asset).safeTransfer(developer, _feeShare);
     }
 
     function withdrawEth(address _recipient) public  {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == owner, "NoFun/withdrawEth - only owner");
         uint256 _feeShare;
         uint256 _ownerShare;
 
@@ -42,7 +47,7 @@ contract NoFun {
     }
 
     function shutdown() public  {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == owner, "NoFun/shutdown - only owner");
         uint256 _feeShare;
         uint256 _ownerShare;
 
@@ -54,7 +59,7 @@ contract NoFun {
     }
 
     function transfer(address _newOwner) public returns (bool) {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == owner, "NoFun/transfer - only owner");
         owner = _newOwner;
         return true;
     }

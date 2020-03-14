@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "ETH <=> BTC trades",
   "scripts": {
-    "coverage": "npx solidity-coverage",
     "compile": "truffle compile",
+    "test:coverage": "npx solidity-coverage",
     "lint": "solium -d contracts/ && eslint ./test",
     "lint:fix": "solium --fix -d contracts/ && eslint --fix ./test",
     "test": "truffle test"
@@ -12,19 +12,21 @@
   "author": "James Prestwich",
   "license": "NONE",
   "dependencies": {
-    "bitcoin-spv": "git+https://github.com/summa-tx/bitcoin-spv.git#v2.0.0",
+    "@summa-tx/bitcoin-spv-sol": "^3.0.0",
+    "@summa-tx/relay-sol": "^2.0.0",
     "bn.js": "^5.0.0",
+    "openzeppelin-solidity": "^2.5.0",
     "solc": "^0.4.26",
-    "truffle": "^5.0.27",
-    "web3": "^1.0.0-beta.55"
+    "dotenv": "^8.2.0"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.2.0",
     "eslint-plugin-import": "^2.18.0",
     "eth-gas-reporter": "^0.2.4",
-    "ganache-cli": "^6.1.8",
-    "mocha": "^5.2.0",
-    "solidity-coverage": "^0.6.3"
+    "solidity-coverage": "^0.6.3",
+    "solium": "^1.2.5",
+    "@truffle/hdwallet-provider": "^1.0.33",
+    "truffle-plugin-verify": "^0.3.5"
   }
 }

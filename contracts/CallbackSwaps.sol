@@ -2,9 +2,11 @@ pragma solidity ^0.5.10;
 
 import {NoFun} from "./NoFun.sol";
 import {Factory} from "./CloneFactory.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
 import {CallbackSwap} from "./CallbackSwap.sol";
-import {IERC721} from "./interfaces/IERC721.sol";
+
+import {ERC20} from "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import {ERC721} from "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import {SafeERC20} from "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
 
 
 contract CallbackSwapEth is CallbackSwap {
@@ -49,6 +51,8 @@ contract CallbackSwapEth is CallbackSwap {
 
 contract CallbackSwap20 is CallbackSwap {
 
+    using SafeERC20 for ERC20;
+
     constructor (
         address _developer,
         address _proofProvider
@@ -60,10 +64,7 @@ contract CallbackSwap20 is CallbackSwap {
     function ensureFunding (Listing storage _listing) internal {
         require(msg.value == 0, "Do not burn ether here please");
         require(_listing.value > 0, "_value must be greater than 0");
-        require(
-            IERC20(_listing.asset).transferFrom(msg.sender, address(this), _listing.value),
-            "transferFrom failed"
-        );
+        ERC20(_listing.asset).safeTransferFrom(msg.sender, address(this), _listing.value);
     }
 
 
@@ -73,9 +74,7 @@ contract CallbackSwap20 is CallbackSwap {
     function distribute(Listing storage _listing) internal {
         if (_listing.bidder == _listing.seller) {
             // No fee for cancellation
-            require(
-                IERC20(_listing.asset).transfer(_listing.seller, _listing.value),
-                "Cancellation transfer failed");
+            ERC20(_listing.asset).safeTransfer(_listing.seller, _listing.value);
         } else {
             // Calculate fee and bidder shares
             uint256 _feeShare;
@@ -83,17 +82,9 @@ contract CallbackSwap20 is CallbackSwap {
             (_feeShare, _bidderShare) = _allocate(_listing.value);
 
             // send developer fee
-            require(
-                IERC20(_listing.asset).transfer(
-                    developer, _feeShare),
-                "Developer transfer failed."
-            );
-
+            ERC20(_listing.asset).safeTransfer(developer, _feeShare);
             // send bidder proceeds
-            require(
-                IERC20(_listing.asset).transfer(_listing.bidder, _bidderShare),
-                "Bidder transfer failed."
-            );
+            ERC20(_listing.asset).safeTransfer(_listing.bidder, _bidderShare);
         }
     }
 }
@@ -111,7 +102,7 @@ contract CallbackSwap721 is CallbackSwap {
     /// @param _listing     The listing that we expect to be funded
     function ensureFunding (Listing storage _listing) internal {
         require(msg.value == 0, "Do not burn ether here please");
-        IERC721(_listing.asset).transferFrom(msg.sender, address(this), _listing.value);
+        ERC721(_listing.asset).transferFrom(msg.sender, address(this), _listing.value);
     }
 
     /// @notice             Transfers the NFT to the bidder
@@ -119,12 +110,14 @@ contract CallbackSwap721 is CallbackSwap {
     /// @param _listing     A pointer to the listing
     function distribute(Listing storage _listing) internal {
         // Transfer tokens to bidder
-        IERC721(_listing.asset).transferFrom(
+        ERC721(_listing.asset).transferFrom(
             address(this), _listing.bidder, _listing.value);
     }
 }
 
 contract CallbackSwapNoFun is CallbackSwap, Factory {
+
+    using SafeERC20 for ERC20;
 
     address noFun;  // The NoFun implementation for cloning
 
@@ -136,16 +129,13 @@ contract CallbackSwapNoFun is CallbackSwap, Factory {
         noFun = _noFun;
     }
 
-
     /// @notice             Ensures that the Tokens are transferred to a new wrapper
     /// @dev                Calls transferFrom on the erc721 contract, and checks that no ether is being burnt
     /// @param _listing     The listing that we expect to be funded
     function ensureFunding (Listing storage _listing) internal {
         _listing.wrapper = createClone(noFun);
         NoFun(_listing.wrapper).init(developer, _listing.asset);
-        require(
-            IERC20(_listing.asset).transferFrom(msg.sender, _listing.wrapper, _listing.value),
-            "Funding transfer failed");
+        ERC20(_listing.asset).safeTransferFrom(msg.sender, _listing.wrapper, _listing.value);
     }
 
     /// @notice             Transfers the NoFun wrapper to the bidder
