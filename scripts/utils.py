@@ -12,6 +12,8 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Util.Padding import pad, unpad
 from riemann import utils as rutils
 
+from riemann.tx import Tx
+from typing import Any, Tuple
 
 # TODO: CHANGE FOR WINDOWS
 PATH = os.path.expanduser('~/.integral/bidder/')
@@ -20,7 +22,7 @@ PBKDF_ITERATIONS = 100000
 SIGHASH_ALL = 0x01
 
 
-def get_value_and_lock_time(tx):
+def get_value_and_lock_time(tx: Tx) -> Tuple[int, int]:
     '''Parses the time lock and first output's value from a txn
 
     Args:
@@ -32,7 +34,7 @@ def get_value_and_lock_time(tx):
             rutils.le2i(tx.lock_time))
 
 
-def sign_hash(hash_bytes, privkeydata):
+def sign_hash(hash_bytes: bytes, privkeydata):  # type: ignore
     '''Signs a hash with a private key
 
     Args:
@@ -48,7 +50,7 @@ def sign_hash(hash_bytes, privkeydata):
         sigencode=sigencode_der_canonize).hex()
 
 
-def coerce_key(data):
+def coerce_key(data) -> ecdsa.SigningKey:  # type: ignore
     ''' Coerces key data to an ECDSA signing_key object
     Args:
         data (*): A key in some supported format
@@ -64,7 +66,7 @@ def coerce_key(data):
         curve=ecdsa.SECP256k1)
 
 
-def write_to_file(data, filename):
+def write_to_file(data: bytes, filename: str) -> bool:
     '''
     writes bytes to a file with termination protection
     '''
@@ -74,20 +76,27 @@ def write_to_file(data, filename):
             return True
 
 
-def write_encrypted_json_file(data_dict, filename, secret_phrase):
+def write_encrypted_json_file(
+        data_dict: dict,
+        filename: str,
+        secret_phrase: str) -> None:
     msg = json.dumps(data_dict).encode('utf-8')
     msg = encode_aes(msg, secret_phrase)
     write_to_file(msg, filename)
 
 
-def read_encrypted_json_file(filename, secret_phrase):
+def read_encrypted_json_file(filename: str, secret_phrase: str) -> Any:
         with open(filename, 'rb') as datafile:
             content = datafile.read()
             content = decode_aes(content, secret_phrase).decode('utf-8')
             return json.loads(content)
 
 
-def pbkdf2_hmac(data, salt=b'', hash_name='sha512', iterations=2048):
+def pbkdf2_hmac(
+        data: bytes,
+        salt: bytes = b'',
+        hash_name: str = 'sha512',
+        iterations: int = 2048) -> bytes:
     ''' Key stretching function PBKDF2 using HMAC-SHA512 to implement BIP39.
     Args:
         data       (bytes): data to stretch, mnemonic for BIP39
@@ -100,7 +109,7 @@ def pbkdf2_hmac(data, salt=b'', hash_name='sha512', iterations=2048):
     return hashlib.pbkdf2_hmac(hash_name, data, salt, iterations)
 
 
-def _aes_encrypt_with_iv(key, iv, data_bytes):
+def _aes_encrypt_with_iv(key: bytes, iv: bytes, data_bytes: bytes) -> bytes:
     '''Encrypts a message with a key.
     Args:
         key         (bytes): the AES key (32 bytes)
@@ -114,7 +123,7 @@ def _aes_encrypt_with_iv(key, iv, data_bytes):
     return e
 
 
-def _aes_decrypt_with_iv(key, iv, data_bytes):
+def _aes_decrypt_with_iv(key: bytes, iv: bytes, data_bytes: bytes) -> bytes:
     '''Decrypts a message with a key.
     Args:
         key         (bytes): the AES key (32 bytes)
@@ -132,7 +141,7 @@ def _aes_decrypt_with_iv(key, iv, data_bytes):
         raise e
 
 
-def encode_aes(message_bytes, secret_phrase):
+def encode_aes(message_bytes: bytes, secret_phrase: str) -> bytes:
     '''Encrypts a message with a phrase
     Args:
         message_bytes   (bytes): the bytes to encrypt
@@ -159,7 +168,7 @@ def encode_aes(message_bytes, secret_phrase):
     return encrypted_message_bytes
 
 
-def decode_aes(encrypted_message_bytes, secret_phrase):
+def decode_aes(encrypted_message_bytes, secret_phrase):  # type: ignore
     '''Decrypts a message with a phrase
     Args:
         encrypted_message_bytes (bytes): the encrypted message, prepended with
@@ -201,16 +210,16 @@ class TerminateProtected:
     """
     killed = False
 
-    def _handler(self, signum, frame):
+    def _handler(self, signum, frame):  # type: ignore
         logging.error('Received SIGINT or SIGTERM!'
                       'Finishing this block, then exiting.')
         self.killed = True
 
-    def __enter__(self):
+    def __enter__(self):  # type: ignore
         self.old_sigint = signal.signal(signal.SIGINT, self._handler)
         self.old_sigterm = signal.signal(signal.SIGTERM, self._handler)
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type, value, traceback):  # type: ignore
         if self.killed:
             sys.exit(0)
         signal.signal(signal.SIGINT, self.old_sigint)
@@ -242,7 +251,7 @@ class TerminateProtected:
 # THE SOFTWARE.
 
 
-def to_pubkey(privkey_obj):
+def to_pubkey(privkey_obj: ecdsa.SigningKey) -> bytes:
         """
         Return compressed public key encoding
         Adapted from prusnak's bip32utils
@@ -251,6 +260,7 @@ def to_pubkey(privkey_obj):
 
         ecdsa.SigningKey -> bytes
         """
+        ck = b''
         pubkey_obj = privkey_obj.get_verifying_key()
         padx = (b'\0' * 32 + int_to_string(pubkey_obj.pubkey.point.x()))[-32:]
         if pubkey_obj.pubkey.point.y() & 1:

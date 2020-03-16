@@ -11,9 +11,9 @@ import riemann.tx as tx
 import riemann.utils as rutils
 import riemann.simple as simple
 
-from ether import transactions
+# from ether import transactions
 
-from typing import List, Tuple
+from typing import cast, List, Tuple
 
 GWEI = 1000000000  # 1 GWEI
 ETH_ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -113,10 +113,9 @@ def make_several_auctions(
         network_id=network_id
     ) for p in zip(partial_txns, range(len(partial_txns)))]
 
+    secret_key = bytes.fromhex(eth_privkey)
     signed_ether_txns = [
-        transactions.serialize(
-            iw.sign(tx, bytes.fromhex(eth_privkey)))
-        for tx in unsigned_ether
+        tx.sign(secret_key).serialize().hex() for tx in unsigned_ether
     ]
 
     return split_tx, ether_blobs, signed_ether_txns
@@ -212,7 +211,7 @@ def undo_split(
              bytes.fromhex(control_addr_keypair[1])])
         tx_witnesses.append(wit)
 
-    return unsplit_tx.copy(tx_witnesses=tx_witnesses)
+    return cast(tx.Tx, unsplit_tx.copy(tx_witnesses=tx_witnesses))
 
 
 def make_btc_shutdown_txns(
@@ -225,7 +224,7 @@ def make_btc_shutdown_txns(
         control_addr_keypair: Tuple[str, str],
         change_addr: str,
         eth_addr: str,
-        fee: int = 7700):
+        fee: int = 7700) -> List[str]:
     '''
     Shuts down an auction by winning them with the owner keypair
     Args:
@@ -345,17 +344,16 @@ def make_and_broadcast_btc_shutdown(
     task = asyncio.ensure_future(do())
     return asyncio.get_event_loop().run_until_complete(task)
 
-
-def make_ethereum_settlement_transactions(
-        bitcoin_txids: List[str],
-        start_nonce: int,
-        eth_privkey: str,
-        contract_address: str) -> List[str]:
-    coros = [
-        merkle.get_that_tx(
-            bitcoin_txids[i], 8, contract_address, i + start_nonce)
-        for i in range(len(bitcoin_txids))]
-    task = asyncio.gather(*coros)
-    txns = asyncio.get_event_loop().run_until_complete(task)
-    signed = [iw.sign(txn, bytes.fromhex(eth_privkey)) for txn in txns]
-    return [transactions.serialize(txn) for txn in signed]
+# def make_ethereum_settlement_transactions(
+#         bitcoin_txids: List[str],
+#         start_nonce: int,
+#         eth_privkey: str,
+#         contract_address: str) -> List[str]:
+#     coros = [
+#         merkle.get_that_tx(
+#             bitcoin_txids[i], 8, contract_address, i + start_nonce)
+#         for i in range(len(bitcoin_txids))]
+#     task = asyncio.gather(*coros)
+#     txns = asyncio.get_event_loop().run_until_complete(task)
+#     signed = [iw.sign(txn, bytes.fromhex(eth_privkey)) for txn in txns]
+#     return [transactions.serialize(txn) for txn in signed]

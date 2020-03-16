@@ -3,18 +3,20 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[scripts]
+test = "./scripts/run_tests.sh"
+
 [dev-packages]
 mypy = "*"
 "flake8" = "*"
 
 [packages]
-riemann-tx = ">=1.1.6"
+riemann-tx = "==2.1.0"
 ecdsa = "*"
 pycryptodomex = "*"
 ipython = "*"
 connectrum = "*"
-eth-account = "*"
-riemann-ether = "*"
+riemann-ether = "==6.0.5"
 
 [requires]
-python_version = "3.6"
+python_version = "3.7"

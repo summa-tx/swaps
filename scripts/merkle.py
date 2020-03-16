@@ -12,28 +12,30 @@ from riemann import utils as rutils
 
 # from ether.transactions import UnsignedEthTx
 
-from typing import cast, Tuple, Union
+from typing import Any, cast, Tuple, Union
 
 with open('build/ValidateSPV.json', 'r') as jsonfile:
     j = json.loads(jsonfile.read())
     ABI = json.loads(j['interface'])
 
 
-CLIENT = None
+CLIENT: StratumClient
 
 
-async def _get_client():
-    global CLIENT
-    if CLIENT is not None:
+async def _get_client() -> StratumClient:
+    try:
         return CLIENT
-    else:
+    except NameError:
+        global CLIENT
         CLIENT = await setup_client()
         return CLIENT
 
 
-async def setup_client():
-    if CLIENT is not None:
+async def setup_client() -> StratumClient:
+    try:
         return CLIENT
+    except NameError:
+        pass
 
     server = ServerInfo({
         "nickname": None,
@@ -72,7 +74,7 @@ async def setup_client():
 # # # # # # # # # # # # # # #
 
 
-async def broadcast(t: Union[tx.Tx, str]):
+async def broadcast(t: Union[tx.Tx, str]) -> Any:
     '''
     broadcasts a bitcoin transaction. accepts an object or a string
     '''
@@ -114,7 +116,7 @@ async def get_latest_blockheight() -> int:
     fut, _ = client.subscribe('blockchain.headers.subscribe')
     block_dict = await fut
     print(block_dict)
-    return block_dict['height']
+    return cast(int, block_dict['height'])
 
 
 async def get_block_merkle_root(height: int) -> bytes:
@@ -154,7 +156,7 @@ async def get_header_chain(start_height: int, count: int) -> str:
     res = await client.RPC(
         'blockchain.block.headers', start_height, count)
 
-    return res['hex']
+    return cast(str, res['hex'])
 
 
 async def get_merkle_proof_from_api(tx_id: str, hght: int) -> Tuple[str, int]:
@@ -181,7 +183,7 @@ async def get_merkle_proof_from_api(tx_id: str, hght: int) -> Tuple[str, int]:
     return proof.hex(), pos + 1
 
 
-def verify_proof(proof: bytes, index: int):
+def verify_proof(proof: bytes, index: int) -> bool:
     '''
     verifies a merkle leaf occurs at a specified index given a merkle proof
     '''
@@ -215,7 +217,7 @@ def verify_proof(proof: bytes, index: int):
         return False
     return True
 
-#
+
 # async def get_that_tx(
 #         tx_id: str,
 #         num_headers: int,
@@ -239,7 +241,7 @@ def verify_proof(proof: bytes, index: int):
 #     return txn
 
 
-async def do_it_all(tx_id: str, num_headers: int):
+async def do_it_all(tx_id: str, num_headers: int) -> None:
     '''
     Gets proof info and prints it
     '''
@@ -274,7 +276,7 @@ async def do_it_all(tx_id: str, num_headers: int):
     print(chain)
 
 
-def main():
+def main() -> None:
     # Read tx_id from args, and then get it and its block from explorers
     tx_id = str(sys.argv[1])
     num_headers = int(sys.argv[2]) if len(sys.argv) > 2 else 6

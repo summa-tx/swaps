@@ -2,9 +2,20 @@ import scripts.utils as utils
 from riemann import simple, tx
 from riemann import utils as rutils
 
+from riemann.tx import Outpoint, Tx
+from typing import cast, List, Tuple
 
-def make_partial_tx(outpoint, output_value, output_address,
-                    lock_time=0):
+
+Format = List[Tuple[int, int]]  # sale value, block height
+KeyPair = Tuple[str, str]
+Prevout = Tuple[str, int, int]  # txid, index, value
+Auction = List[Tx]
+
+
+def make_partial_tx(outpoint: Outpoint,
+                    output_value: int,
+                    output_address: str,
+                    lock_time: int = 0) -> Tx:
     '''Creates an unsigned partial tx
     Args:
         outpoint (riemann.tx.Outpoint): the outpoint to spend
@@ -15,20 +26,24 @@ def make_partial_tx(outpoint, output_value, output_address,
     '''
     tx_ins = [simple.unsigned_input(outpoint, sequence=0xFFFFFFFD)]
     tx_outs = [simple.output(output_value, output_address)]
-    return simple.unsigned_witness_tx(
+    return cast(Tx, simple.unsigned_witness_tx(
         tx_ins=tx_ins,
         tx_outs=tx_outs,
-        lock_time=lock_time)
+        lock_time=lock_time))
 
 
-def sign_partial_tx(partial_tx, keypair, prevout_script, prevout_value):
+def sign_partial_tx(
+        partial_tx: Tx,
+        keypair: KeyPair,
+        prevout_script: bytes,
+        prevout_value: bytes) -> Tx:
     '''
     Signs a partial transaction.
     Args:
         partial_tx (riemann.tx.Tx): the partial_tx to sign
         keypair  (tuple(str, str)): privkey as hex, pubkey as hex
         prevout_script     (bytes): the script code of the prevout
-        prevout_value        (int): the value of the prevout in sat
+        prevout_value      (bytes): the value of the prevout in LE uint64
     Returns:
         (riemann.tx.Tx): sighash_singleanyonecanpay signed partial_tx
     '''
@@ -49,8 +64,14 @@ def sign_partial_tx(partial_tx, keypair, prevout_script, prevout_value):
     return partial_tx.copy(tx_witnesses=tx_witnesses)
 
 
-def partial(tx_id, index, prevout_value, recipient_addr,
-            output_value, lock_time, keypair):
+def partial(
+        tx_id: str,
+        index: int,
+        prevout_value: int,
+        recipient_addr: str,
+        output_value: int,
+        lock_time: int,
+        keypair: KeyPair) -> Tx:
     '''
     Makes a partial_tx from human readable information
 
@@ -84,8 +105,13 @@ def partial(tx_id, index, prevout_value, recipient_addr,
     return signed
 
 
-def dutch(tx_id, index, prevout_value, recipient_addr,
-          format_tuples, keypair):
+def dutch(
+        tx_id: str,
+        index: int,
+        prevout_value: int,
+        recipient_addr: str,
+        format_tuples: Format,
+        keypair: KeyPair) -> Auction:
     '''
     Makes a dutch auction given a list representing the format
 
@@ -107,8 +133,13 @@ def dutch(tx_id, index, prevout_value, recipient_addr,
     return ret
 
 
-def dutch_as_hex(tx_id, index, prevout_value, recipient_addr,
-                 format_tuples, keypair):
+def dutch_as_hex(
+        tx_id: str,
+        index: int,
+        prevout_value: int,
+        recipient_addr: str,
+        format_tuples: Format,
+        keypair: KeyPair) -> str:
     '''
     Makes a dutch auction given a list representing the format
 
@@ -130,12 +161,16 @@ def dutch_as_hex(tx_id, index, prevout_value, recipient_addr,
     return b.hex()
 
 
-def multidutch(prevouts, recipient_addr, format_tuples, keypair):
+def multidutch(
+        prevouts: List[Prevout],
+        recipient_addr: str,
+        format_tuples: Format,
+        keypair: KeyPair) -> List[Auction]:
     '''
     Makes identical dutch auctions for each outpoint in a list of outpoints
 
     Args:
-        prevouts (list(tuple(str, str, int))): tuple of txid, index, value
+        prevouts (list(tuple(str, int, int))): tuple of txid, index, value
         recipient_addr                  (str): address of the recipient
         format_tuples (list(tuple(int, int))): tuples of value and timelock
         keypair             (tuple(str, str)): privkey as hex, pubkey as hex
@@ -150,7 +185,11 @@ def multidutch(prevouts, recipient_addr, format_tuples, keypair):
     return ret
 
 
-def multidutch_as_hex(prevouts, recipient_addr, format_tuples, keypair):
+def multidutch_as_hex(
+        prevouts: List[Prevout],
+        recipient_addr: str,
+        format_tuples: Format,
+        keypair: KeyPair) -> List[str]:
     '''
     Makes identical dutch auctions for each outpoint in a list of outpoints
 

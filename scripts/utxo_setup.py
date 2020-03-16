@@ -1,8 +1,18 @@
 from riemann import simple
 
+from typing import cast
+from riemann.tx import Tx
 
-def generate_small_utxos(tx_id, index, prevout_value, recipient_addr,
-                         num_outputs, fee, change_addr, size=550):
+
+def generate_small_utxos(
+        tx_id: str,
+        index: int,
+        prevout_value: int,
+        recipient_addr: str,
+        num_outputs: int,
+        fee: int,
+        change_addr: str,
+        size: int = 550) -> Tx:
     '''
     Makes new utxos.
     All utxos have the same address (i.e. the same keypair)
@@ -29,4 +39,4 @@ def generate_small_utxos(tx_id, index, prevout_value, recipient_addr,
     change = prevout_value - (size * num_outputs) - fee
     tx_outs.append(simple.output(change, change_addr))
 
-    return simple.unsigned_witness_tx(tx_ins, tx_outs)
+    return cast(Tx, simple.unsigned_witness_tx(tx_ins, tx_outs))

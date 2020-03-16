@@ -2,6 +2,9 @@ import json
 
 from ether import calldata, transactions
 
+from typing import Any
+
+
 # Loads the abi from the file
 # For some reason solc generates json stored as a string inside json
 # So we have to call .loads twice
@@ -12,10 +15,10 @@ with open('build/IntegralAuction.json', 'r') as jsonfile:
 
 def create_unsigned_tx(
         contract_address: str,
-        value=0,
-        start_gas=500000,
-        gas_price=20,
-        nonce=0,
+        value: int = 0,
+        start_gas: int = 500000,
+        gas_price: int = 20,
+        nonce: int = 0,
         tx_data: bytes = b'',
         network_id: int = 1) -> transactions.UnsignedEthTx:
     '''Creates an unsigned contract call transaction.
@@ -50,7 +53,7 @@ def create_open_data(
         reservePrice: int,
         reqDiff: int,
         asset: str,
-        value: int):
+        value: int) -> bytes:
     '''Makes an data blob for calling open
 
     Args:
@@ -73,14 +76,15 @@ def create_open_data(
     return calldata.call('open', contract_method_args, ABI)
 
 
-def create_claim_data(tx, proof, index, headers):
+def create_claim_data(
+        tx: bytes, proof: bytes, index: int, headers: bytes) -> bytes:
     '''Makes an unsigned transaction calling claim
 
     Args:
         tx         (bytes): the fully signed tx
         proof      (bytes): the merkle inclusion proof
         index        (int): the index of the tx for merkle verification
-        headers      (str): the header chain containing work
+        headers    (bytes): the header chain containing work
 
     Returns:
         (bytes): the data blob
@@ -99,7 +103,7 @@ def create_open_tx(
         reqDiff: int,
         asset: str,
         value: int,
-        **kwargs):
+        **kwargs: Any) -> transactions.UnsignedEthTx:
     '''Makes an unsigned transaction calling open
 
     Args:
@@ -133,7 +137,7 @@ def create_claim_tx(
         proof: bytes,
         index: int,
         headers: bytes,
-        **kwargs):
+        **kwargs: Any) -> transactions.UnsignedEthTx:
     '''Makes an unsigned transaction calling claim
 
     Args:
@@ -162,8 +166,8 @@ def create_claim_tx(
 def sign(
         tx: transactions.UnsignedEthTx,
         key: bytes) -> transactions.SignedEthTx:
-    """Sign this transaction with a private key.
+    '''
+    Sign this transaction with a private key.
     A potentially already existing signature would be overridden.
-    """
-
-    return transactions.sign_transaction(tx, key)
+    '''
+    return tx.sign(key)
