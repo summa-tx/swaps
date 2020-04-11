@@ -1,34 +1,45 @@
 /* eslint-disable */
 
 require('dotenv').config();
+
+const Kit = require('@celo/contractkit')
+
 const HDWalletProvider = require('@truffle/hdwallet-provider');
 const infuraKey = process.env.SUMMA_RELAY_DEPLOY_INFURA_KEY;
 const mnemonic = process.env.MNEMONIC;
 
 const ropsten = {
   provider: () => new HDWalletProvider(mnemonic, `https://ropsten.infura.io/v3/${infuraKey}`),
-  network_id: 3,       // Ropsten's id
-  gas: 5500000,        // Ropsten has a lower block limit than mainnet
-  confirmations: 2,    // # of confs to wait between deployments. (default: 0)
-  timeoutBlocks: 200   // # of blocks before a deployment times out  (minimum/default: 50)
+  network_id: 3,
+  gas: 5500000,
+  confirmations: 2,
+  timeoutBlocks: 200
 }
 
 const kovan = {
   provider: () => new HDWalletProvider(mnemonic, `https://kovan.infura.io/v3/${infuraKey}`),
-  network_id: 42,      // Kovan's id
+  network_id: 42,
   gas: 5500000,
-  confirmations: 2,    // # of confs to wait between deployments. (default: 0)
-  timeoutBlocks: 200   // # of blocks before a deployment times out  (minimum/default: 50)
+  confirmations: 2,
+  timeoutBlocks: 200
 }
 
 const alfajores = {
-  host: process.env.ALFAJORES_NODE_URL,
-  port: 8545,            // Standard Ethereum port (default: none)
-  network_id: 44785,
-  port: process.env.ALFAJORES_NODE_PORT,
-  from: process.env.ALFAJORES_FROM,
-  gas: 8000000,
-  gasPrice: 100000000000
+  provider: () => {
+    const provider = new HDWalletProvider(mnemonic, 'http://127.0.0.1:9999'); // sinkhole any requests
+    // slip44
+    const celoBIP44 = "m/44'/52752'/0'/0/0";
+    const hdkey = provider.hdwallet.derivePath(celoBIP44);
+    // Get the privkey and hand it to the kit
+    const privkey = hdkey._hdkey.privateKey.toString('hex');
+    const kit = Kit.newKit('https://alfajores-forno.celo-testnet.org');
+    kit.addAccount(privkey);
+    return kit.web3.currentProvider;
+  },
+  network_id: 44786,
+  gas: 5500000,
+  confirmations: 2,
+  timeoutBlocks: 200
 }
 
 module.exports = {
@@ -43,28 +54,20 @@ module.exports = {
     coverage: {
       host: "localhost",
       network_id: "*",
-      port: 8555,         // <-- If you change this, also set the port option in .solcover.js.
-      gas: 0xfffffffffff, // <-- Use this high gas value
-      gasPrice: 0x01      // <-- Use this low gas price
+      port: 8555,
+      gas: 0xfffffffffff,
+      gasPrice: 0x01
     },
 
-    alfajores: alfajores,
-
     ropsten: ropsten,
-    ropsten_test: ropsten,
-
     kovan: kovan,
-    kovan_test: kovan,
+    alfajores: alfajores,
   },
 
-  // mocha: {
-  // },
-
-  // Configure your compilers
   compilers: {
     solc: {
-      version: "0.5.10",   // Fetch exact version from solc-bin (default: truffle's version)
-      settings: {          // See the solidity docs for advice about optimization and evmVersion
+      version: "0.5.10",
+      settings: {
         optimizer: {
           enabled: true,
           runs: 200

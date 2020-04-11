@@ -1,5 +1,6 @@
-const Migrations = artifacts.require("Migrations");
+/* global artifacts */
+const Migrations = artifacts.require('Migrations');
 
-module.exports = function(deployer) {
+module.exports = async (deployer) => {
   deployer.deploy(Migrations);
 };

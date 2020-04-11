@@ -67,7 +67,6 @@ contract CallbackSwap20 is CallbackSwap {
         ERC20(_listing.asset).safeTransferFrom(msg.sender, address(this), _listing.value);
     }
 
-
     /// @notice             Transfers tokens to the bidder and developer
     /// @dev                Calls allocate to calculate shares
     /// @param _listing     A pointer to the listing

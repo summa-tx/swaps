@@ -12,12 +12,13 @@
   "author": "James Prestwich",
   "license": "NONE",
   "dependencies": {
+    "@celo/contractkit": "^0.3.3",
     "@summa-tx/bitcoin-spv-sol": "^3.0.0",
     "@summa-tx/relay-sol": "^2.0.0",
     "bn.js": "^5.0.0",
+    "dotenv": "^8.2.0",
     "openzeppelin-solidity": "^2.5.0",
-    "solc": "^0.4.26",
-    "dotenv": "^8.2.0"
+    "solc": "^0.4.26"
   },
   "devDependencies": {
     "eslint": "^5.16.0",

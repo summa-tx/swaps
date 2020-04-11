@@ -112,7 +112,8 @@ contract CallbackSwap is ICallbackSwap, ISPVConsumer {
         bytes calldata _vin,
         bytes calldata _vout,
         uint256,
-        uint16
+        uint8,
+        uint8
     ) external {
         require(msg.sender == address(proofProvider), "CallbackSwap/spv - Not the SPV provider");
 
